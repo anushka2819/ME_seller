@@ -8,7 +8,8 @@ import {
   CreditCard,
   Building,
   Save,
-  CheckCircle
+  CheckCircle,
+  Image as ImageIcon
 } from 'lucide-react';
 import { getSellerSession, updateSellerProfile } from '../utils/storage';
 
@@ -45,6 +46,21 @@ const SettingsScreen = () => {
       setIfsc(seller.ifsc || 'SBIN0008432');
     }
   }, []);
+
+  const handleLogoUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 1024 * 1024) { // 1MB limit to avoid localStorage size constraints
+        alert('Please choose a logo file under 1MB to ensure saving works smoothly.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogo(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -155,15 +171,28 @@ const SettingsScreen = () => {
 
           <div className="form-double-col">
             <div className="form-group">
-              <label htmlFor="shop-logo">Shop Logo Image URL</label>
-              <input 
-                type="url" 
-                id="shop-logo" 
-                className="form-input" 
-                placeholder="e.g. https://images.unsplash.com/photo-..." 
-                value={logo} 
-                onChange={(e) => setLogo(e.target.value)}
-              />
+              <label>Shop Logo Image</label>
+              <div className="logo-upload-wrapper">
+                <input 
+                  type="file" 
+                  id="shop-logo-upload" 
+                  accept="image/*"
+                  onChange={handleLogoUpload}
+                  style={{ display: 'none' }}
+                />
+                <label htmlFor="shop-logo-upload" className="btn btn-secondary logo-upload-btn">
+                  <ImageIcon size={16} /> Choose Image File
+                </label>
+                {logo && (
+                  <button 
+                    type="button" 
+                    onClick={() => setLogo('')} 
+                    className="btn btn-danger btn-sm remove-logo-btn"
+                  >
+                    Clear Logo
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="form-group">
@@ -403,6 +432,34 @@ const SettingsScreen = () => {
           border-radius: 50%;
           object-fit: cover;
           border: 2px solid var(--accent);
+        }
+
+        .logo-upload-wrapper {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          margin-top: 0.25rem;
+        }
+
+        .logo-upload-btn {
+          cursor: pointer;
+          font-size: 0.85rem;
+          padding: 0.7rem 1rem;
+          border: 1px dashed var(--accent) !important;
+          background: var(--accent-soft) !important;
+          color: var(--text-primary) !important;
+          border-radius: 8px;
+        }
+
+        .logo-upload-btn:hover {
+          background: var(--accent) !important;
+          color: white !important;
+        }
+
+        .remove-logo-btn {
+          padding: 0.5rem 0.75rem;
+          font-size: 0.8rem;
+          border-radius: 6px;
         }
       `}</style>
     </div>
