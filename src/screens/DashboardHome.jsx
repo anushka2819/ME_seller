@@ -11,14 +11,23 @@ import {
   PackageCheck
 } from 'lucide-react';
 import { getProducts, getOrders, getAnalyticsStats } from '../utils/storage';
+import { getSellerSession } from '../utils/auth';
 
 const DashboardHome = () => {
   const navigate = useNavigate();
+  const [seller, setSeller] = useState(null);
   const [stats, setStats] = useState(null);
   const [recentOrders, setRecentOrders] = useState([]);
   const [lowStockItems, setLowStockItems] = useState([]);
 
   useEffect(() => {
+    // Fetch seller session
+    const fetchSession = async () => {
+      const session = await getSellerSession();
+      setSeller(session);
+    };
+    fetchSession();
+
     // Fetch dashboard statistics
     const metrics = getAnalyticsStats();
     setStats(metrics);
@@ -50,10 +59,10 @@ const DashboardHome = () => {
   };
 
   return (
-    <div className="dashboard-home">
+    <div className="dashboard-home">    
       <div className="dashboard-welcome-banner">
         <div>
-          <h2>Welcome back to Mind Empowered Hub</h2>
+          <h2>Welcome back to {seller ? seller.shopName : 'Your Marketplace'}</h2>
           <p>Here is your shop's performance overview for today.</p>
         </div>
         <div className="banner-date">
