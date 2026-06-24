@@ -26,7 +26,14 @@ export const getSellerSession = async () => {
         shopName: sellerData.shop_name,
         ownerName: sellerData.owner_name,
         category: sellerData.category,
-        balance: sellerData.balance
+        balance: sellerData.balance,
+        phone: sellerData.phone,
+        description: sellerData.description,
+        logo: sellerData.logo,
+        locationUrl: sellerData.location_url,
+        bankName: sellerData.bank_name,
+        accountNumber: sellerData.account_number,
+        ifsc: sellerData.ifsc
     };
 };
 
@@ -54,7 +61,14 @@ export const loginSeller = async (email, password) => {
         shopName: sellerData.shop_name,
         ownerName: sellerData.owner_name,
         category: sellerData.category,
-        balance: sellerData.balance
+        balance: sellerData.balance,
+        phone: sellerData.phone,
+        description: sellerData.description,
+        logo: sellerData.logo,
+        locationUrl: sellerData.location_url,
+        bankName: sellerData.bank_name,
+        accountNumber: sellerData.account_number,
+        ifsc: sellerData.ifsc
     };
 };
 
@@ -99,6 +113,32 @@ export const logoutSeller = async () => {
     if (error) throw error;
 };
 
+// Upload a shop logo to the 'shop-logos' bucket
+export const uploadShopLogo = async (file) => {
+    try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error("No active seller session");
+
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${session.user.id}/${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+
+        const { data, error } = await supabase.storage
+            .from('shop-logos')
+            .upload(fileName, file);
+
+        if (error) throw error;
+
+        const { data: publicUrlData } = supabase.storage
+            .from('shop-logos')
+            .getPublicUrl(fileName);
+
+        return publicUrlData.publicUrl;
+    } catch (error) {
+        console.error("Error uploading shop logo:", error);
+        throw error;
+    }
+};
+
 // Update Seller Profile
 export const updateSellerProfile = async (updatedDetails) => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -110,7 +150,14 @@ export const updateSellerProfile = async (updatedDetails) => {
         .update({
             shop_name: updatedDetails.shopName,
             owner_name: updatedDetails.ownerName,
-            category: updatedDetails.category
+            category: updatedDetails.category,
+            phone: updatedDetails.phone,
+            description: updatedDetails.description,
+            logo: updatedDetails.logo,
+            location_url: updatedDetails.locationUrl,
+            bank_name: updatedDetails.bankName,
+            account_number: updatedDetails.accountNumber,
+            ifsc: updatedDetails.ifsc
         })
         .eq('id', session.user.id);
 

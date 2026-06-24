@@ -11,7 +11,7 @@ import {
   CheckCircle,
   Image as ImageIcon
 } from 'lucide-react';
-import { getSellerSession, updateSellerProfile } from '../utils/auth';
+import { getSellerSession, updateSellerProfile, uploadShopLogo } from '../utils/auth';
 
 const SettingsScreen = () => {
   const [shopName, setShopName] = useState('');
@@ -21,6 +21,7 @@ const SettingsScreen = () => {
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
   const [logo, setLogo] = useState('');
+  const [logoFile, setLogoFile] = useState(null); 
   const [locationUrl, setLocationUrl] = useState('');
   
   // Banking payout mock settings
@@ -38,14 +39,14 @@ const SettingsScreen = () => {
           setShopName(seller.shopName || '');
           setOwnerName(seller.ownerName || '');
           setEmail(seller.email || '');
-          setPhone(seller.phone || '9876543210');
-          setCategory(seller.category || 'Wellness');
-          setDescription(seller.description || 'Verified seller partner of the Mind Empowered Community.');
+          setPhone(seller.phone || '');
+          setCategory(seller.category || 'Select Category');
+          setDescription(seller.description || 'Describe your shop...');
           setLogo(seller.logo || '');
-          setLocationUrl(seller.locationUrl || '');
-          setBankName(seller.bankName || 'State Bank of India');
-          setAccountNumber(seller.accountNumber || '•••• •••• •••• 9821');
-          setIfsc(seller.ifsc || 'SBIN0008432');
+          setLocationUrl(seller.locationUrl || 'Enter Google Maps Link');
+          setBankName(seller.bankName || 'Bank Name');
+          setAccountNumber(seller.accountNumber || 'Account Number');
+          setIfsc(seller.ifsc || 'IFSC');
         }
       } catch (err) {
         console.error("Settings session error:", err);
@@ -57,36 +58,47 @@ const SettingsScreen = () => {
   const handleLogoUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 1024 * 1024) { // 1MB limit to avoid localStorage size constraints
-        alert('Please choose a logo file under 1MB to ensure saving works smoothly.');
+      if (file.size > 5 * 1024 * 1024) { 
+        alert('Please choose a logo file under 5MB.');
         return;
       }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setLogo(reader.result);
-      };
-      reader.readAsDataURL(file);
+      setLogoFile(file);
+      // Create a local preview
+      const previewUrl = URL.createObjectURL(file);
+      setLogo(previewUrl);
     }
   };
+
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaved(false);
-
-    const payload = {
-      shopName,
-      ownerName,
-      phone,
-      category,
-      description,
-      logo,
-      locationUrl,
-      bankName,
-      accountNumber,
-      ifsc
-    };
+    setIsSaving(true);
 
     try {
+      let finalLogoUrl = logo;
+
+      // If a new file was selected, upload it
+      if (logoFile) {
+        finalLogoUrl = await uploadShopLogo(logoFile);
+        setLogo(finalLogoUrl); // Update the preview to the actual URL
+        setLogoFile(null);     // Reset file since it's uploaded
+      }
+
+      const payload = {
+        shopName,
+        ownerName,
+        phone,
+        category,
+        description,
+        logo: finalLogoUrl,
+        locationUrl,
+        bankName,
+        accountNumber,
+        ifsc
+      };
+
       await updateSellerProfile(payload);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
@@ -96,6 +108,8 @@ const SettingsScreen = () => {
     } catch (err) {
       console.error("Error updating profile", err);
       alert("Failed to save settings.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -196,7 +210,7 @@ const SettingsScreen = () => {
                 {logo && (
                   <button 
                     type="button" 
-                    onClick={() => setLogo('')} 
+                    onClick={() => { setLogo(''); setLogoFile(null); }} 
                     className="btn btn-danger btn-sm remove-logo-btn"
                   >
                     Clear Logo
@@ -311,9 +325,9 @@ const SettingsScreen = () => {
         </div>
 
         <div className="settings-actions-footer">
-          <button type="submit" className="btn btn-primary btn-save">
+          <button type="submit" className="btn btn-primary btn-save" disabled={isSaving}>
             <Save size={18} />
-            <span>Save Shop Changes</span>
+            <span>{isSaving ? 'Saving...' : 'Save Shop Changes'}</span>
           </button>
         </div>
       </form>
