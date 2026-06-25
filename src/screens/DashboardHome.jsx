@@ -130,9 +130,9 @@ const DashboardHome = () => {
             action: () => navigate('/orders')
           },
           { 
-            title: 'Low/No Stock Items', 
+            title: 'No Stock Items', 
             value: stats.outOfStockItems, 
-            sub: 'Need restructuring', 
+            sub: 'Need restocking', 
             icon: AlertTriangle,
             color: stats.outOfStockItems > 0 ? 'danger' : 'success',
             action: () => navigate('/products')

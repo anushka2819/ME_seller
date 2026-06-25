@@ -1,12 +1,8 @@
-
-// Initialization check for other things if needed (like session, products fallback etc)
+// remove this
 export const initStorage = () => {
-  // Keeping this just in case other parts rely on it being present,
-  // but products and orders are now handled via Supabase.
 };
 
-// Analytics helper
-// Now accepts orders and products directly, so it can calculate stats based on Supabase data
+// Analytics helper, calculate stats based on Supabase data
 export const getAnalyticsStats = (products = [], orders = []) => {
   const totalEarnings = orders
     .filter(o => o.fulfillment_status === 'Delivered' || o.fulfillment_status === 'Shipped')
