@@ -3,7 +3,18 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from './Sidebar';
 import { getSellerSession } from '../utils/auth';
+import { getNotifications, markNotificationAsRead, clearAllNotifications as clearAllDbNotifications } from '../utils/notifications';
+import { supabase } from '../utils/supabaseClient';
 import { Bell, ShoppingBag, ShieldCheck } from 'lucide-react';
+
+// Helper for relative time
+const timeAgo = (dateString) => {
+  const diff = Math.floor((new Date() - new Date(dateString)) / 1000);
+  if (diff < 60) return 'Just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)} mins ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
+  return `${Math.floor(diff / 86400)} days ago`;
+};
 
 const DashboardLayout = ({ children, onLogout }) => {
   const navigate = useNavigate();
@@ -11,22 +22,26 @@ const DashboardLayout = ({ children, onLogout }) => {
   
   // Notification states
   const [showNotifications, setShowNotifications] = useState(false);
-  const [hasUnread, setHasUnread] = useState(true);
-  const [notifications, setNotifications] = useState([
-    { id: 1, message: 'New order ORD-8924 received from Meera Surendran.', time: '10 mins ago', path: '/orders', read: false },
-    { id: 2, message: 'Low Stock warning: "Empowerment Tote Bag" is down to 5 units.', time: '2 hours ago', path: '/products', read: false },
-    { id: 3, message: 'Fulfillment confirmation: Payout of ₹560.00 processed for ORD-8912.', time: '1 day ago', path: '/analytics', read: true }
-  ]);
+  const [hasUnread, setHasUnread] = useState(false);
+  const [notifications, setNotifications] = useState([]);
 
-  const clearAllNotifications = (e) => {
+  const clearAllNotifications = async (e) => {
     e.stopPropagation();
+    if (seller) await clearAllDbNotifications(seller.id);
     setNotifications([]);
     setHasUnread(false);
   };
 
-  const handleNotificationClick = (path) => {
+  const handleNotificationClick = async (notif) => {
     setShowNotifications(false);
-    navigate(path);
+    if (!notif.is_read && seller) {
+      await markNotificationAsRead(seller.id, notif.id);
+      setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
+      setHasUnread(notifications.some(n => n.id !== notif.id && !n.is_read));
+    }
+    if (notif.path) {
+      navigate(notif.path);
+    }
   };
 
   useEffect(() => {
@@ -45,6 +60,36 @@ const DashboardLayout = ({ children, onLogout }) => {
     };
     fetchSession();
   }, [navigate]);
+
+  // Fetch notifications & setup realtime ONLY after seller is loaded
+  useEffect(() => {
+    if (!seller) return;
+
+    let channel;
+    const loadNotifications = async () => {
+      const notifs = await getNotifications(seller.id);
+      setNotifications(notifs);
+      setHasUnread(notifs.some(n => !n.is_read));
+    };
+    loadNotifications();
+
+    // Realtime subscription for new notifications
+    channel = supabase
+      .channel('seller_notifications')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'marketplace_dataspace', table: 'shop_notifications', filter: `seller_id=eq.${seller.id}` },
+        (payload) => {
+          setNotifications(current => [payload.new, ...current]);
+          setHasUnread(true);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, [seller]);
 
   if (!seller) {
     return (
@@ -143,10 +188,10 @@ const DashboardLayout = ({ children, onLogout }) => {
                         notifications.map(notif => (
                           <div 
                             key={notif.id} 
-                            className={`notification-item ${notif.read ? 'read' : 'unread'}`}
-                            onClick={() => handleNotificationClick(notif.path)}
+                            className={`notification-item ${notif.is_read ? 'read' : 'unread'}`}
+                            onClick={() => handleNotificationClick(notif)}
                           >
-                            <span className="item-time">{notif.time}</span>
+                            <span className="item-time">{timeAgo(notif.created_at)}</span>
                             <p>{notif.message}</p>
                           </div>
                         ))

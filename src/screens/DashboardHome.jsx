@@ -9,7 +9,9 @@ import {
   AlertTriangle,
   ArrowRight,
   TrendingUp,
-  PackageCheck
+  PackageCheck,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { getAnalyticsStats } from '../utils/storage';
 import { getOrders } from '../utils/order';
@@ -22,6 +24,8 @@ const DashboardHome = () => {
   const [stats, setStats] = useState(null);
   const [recentOrders, setRecentOrders] = useState([]);
   const [lowStockItems, setLowStockItems] = useState([]);
+  const [stockPage, setStockPage] = useState(0);
+  const stockPerPage = 3;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -229,25 +233,48 @@ const DashboardHome = () => {
                 <p>All listings are well-stocked!</p>
               </div>
             ) : (
-              lowStockItems.map(item => (
-                <div key={item.id} className="stock-alert-item">
-                  <div className="alert-item-info">
-                    <h4>{item.name}</h4>
-                    <span>Category: {item.category}</span>
+              <>
+                {lowStockItems.slice(stockPage * stockPerPage, (stockPage + 1) * stockPerPage).map(item => (
+                  <div key={item.id} className="stock-alert-item">
+                    <div className="alert-item-info">
+                      <h4>{item.name}</h4>
+                      <span>Category: {item.category}</span>
+                    </div>
+                    <div className="alert-item-status">
+                      <span className={`badge ${item.stock === 0 ? 'badge-danger' : 'badge-warning'}`}>
+                        {item.stock === 0 ? 'Out of Stock' : `${item.stock} left`}
+                      </span>
+                      <button 
+                        onClick={() => navigate('/products')} 
+                        className="restock-action-btn"
+                      >
+                        Update
+                      </button>
+                    </div>
                   </div>
-                  <div className="alert-item-status">
-                    <span className={`badge ${item.stock === 0 ? 'badge-danger' : 'badge-warning'}`}>
-                      {item.stock === 0 ? 'Out of Stock' : `${item.stock} left`}
+                ))}
+                {lowStockItems.length > stockPerPage && (
+                  <div className="stock-pagination">
+                    <button 
+                      onClick={() => setStockPage(p => p - 1)} 
+                      disabled={stockPage === 0}
+                      className="stock-page-btn"
+                    >
+                      <ChevronLeft size={16} /> Prev
+                    </button>
+                    <span className="stock-page-indicator">
+                      {stockPage + 1} / {Math.ceil(lowStockItems.length / stockPerPage)}
                     </span>
                     <button 
-                      onClick={() => navigate('/products')} 
-                      className="restock-action-btn"
+                      onClick={() => setStockPage(p => p + 1)} 
+                      disabled={(stockPage + 1) * stockPerPage >= lowStockItems.length}
+                      className="stock-page-btn"
                     >
-                      Update
+                      Next <ChevronRight size={16} />
                     </button>
                   </div>
-                </div>
-              ))
+                )}
+              </>
             )}
           </div>
         </motion.div>
@@ -554,8 +581,41 @@ const DashboardHome = () => {
           flex-direction: column;
           gap: 1rem;
           flex: 1;
-          overflow-y: auto;
-          max-height: 240px;
+        }
+
+        .stock-pagination {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding-top: 0.5rem;
+        }
+
+        .stock-page-btn {
+          display: flex;
+          align-items: center;
+          gap: 0.25rem;
+          font-size: 0.8rem;
+          font-weight: 600;
+          color: var(--accent);
+          padding: 0.35rem 0.6rem;
+          border-radius: 8px;
+          transition: var(--transition);
+        }
+
+        .stock-page-btn:hover:not(:disabled) {
+          background: rgba(255, 118, 18, 0.08);
+        }
+
+        .stock-page-btn:disabled {
+          color: var(--text-secondary);
+          opacity: 0.4;
+          cursor: not-allowed;
+        }
+
+        .stock-page-indicator {
+          font-size: 0.75rem;
+          color: var(--text-secondary);
+          font-weight: 500;
         }
 
         .no-alerts-placeholder {
