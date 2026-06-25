@@ -133,7 +133,7 @@ const AnalyticsScreen = () => {
           </div>
           <div>
             <span>Conversion Rate</span>
-            <h3>3.2%</h3>
+            <h3>{stats.conversionRate}%</h3>
             <p className="trend-label positive">
               <TrendingUp size={12} /> +0.5% optimization increase
             </p>

@@ -24,12 +24,20 @@ export const getAnalyticsStats = (products = [], orders = []) => {
     { name: 'Jun', revenue: totalEarnings + 8000 } // current month plus previous mock base
   ];
 
+  const totalViews = products.reduce((sum, p) => sum + (p.views || 0), 0);
+  let conversionRate = 0;
+  if (totalViews > 0) {
+    conversionRate = ((totalItemsSold / totalViews) * 100).toFixed(1);
+  }
+
   return {
     totalEarnings,
     totalItemsSold,
     pendingOrders,
     outOfStockItems,
     monthlyRevenue,
-    activeListingsCount: products.filter(p => p.status === 'active').length
+    activeListingsCount: products.filter(p => p.status === 'active').length,
+    totalViews,
+    conversionRate
   };
 };
