@@ -4,9 +4,35 @@ export const initStorage = () => {
 
 // Analytics helper, calculate stats based on Supabase data
 export const getAnalyticsStats = (products = [], orders = []) => {
-  const totalEarnings = orders
-    .filter(o => o.fulfillment_status === 'Delivered' || o.fulfillment_status === 'Shipped')
+  const validEarningsOrders = orders
+    .filter(o => o.fulfillment_status === 'Delivered' || o.fulfillment_status === 'Shipped');
+
+  const totalEarnings = validEarningsOrders
     .reduce((sum, o) => sum + parseFloat(o.total_amount || 0), 0);
+
+  // Calculate earnings trend
+  const now = new Date();
+  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+
+  const earningsThisMonth = validEarningsOrders
+    .filter(o => new Date(o.created_at) >= currentMonthStart)
+    .reduce((sum, o) => sum + parseFloat(o.total_amount || 0), 0);
+
+  const earningsLastMonth = validEarningsOrders
+    .filter(o => {
+      const d = new Date(o.created_at);
+      return d >= lastMonthStart && d <= lastMonthEnd;
+    })
+    .reduce((sum, o) => sum + parseFloat(o.total_amount || 0), 0);
+
+  let earningsTrend = 0;
+  if (earningsLastMonth > 0) {
+    earningsTrend = parseFloat((((earningsThisMonth - earningsLastMonth) / earningsLastMonth) * 100).toFixed(1));
+  } else if (earningsThisMonth > 0) {
+    earningsTrend = 100;
+  }
 
   const pendingOrders = orders.filter(o => o.fulfillment_status === 'Processing').length;
   const outOfStockItems = products.filter(p => p.stock === 0).length;
@@ -38,6 +64,7 @@ export const getAnalyticsStats = (products = [], orders = []) => {
     monthlyRevenue,
     activeListingsCount: products.filter(p => p.status === 'active').length,
     totalViews,
-    conversionRate
+    conversionRate,
+    earningsTrend
   };
 };

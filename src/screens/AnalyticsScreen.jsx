@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { 
   BarChart3, 
   TrendingUp, 
+  TrendingDown,
   DollarSign, 
   ShoppingBag, 
   Award,
@@ -108,8 +109,9 @@ const AnalyticsScreen = () => {
           <div>
             <span>Net Shop Earnings</span>
             <h3>₹{stats.totalEarnings.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</h3>
-            <p className="trend-label positive">
-              <TrendingUp size={12} /> +15.8% compared to last month
+            <p className={`trend-label ${stats.earningsTrend >= 0 ? 'positive' : 'negative'}`}>
+              {stats.earningsTrend >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+              {stats.earningsTrend > 0 ? '+' : ''}{stats.earningsTrend}% compared to last month
             </p>
           </div>
         </div>
