@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { 
   ClipboardList, 
   Search, 
@@ -18,15 +19,11 @@ import { getOrders, updateOrderStatus } from '../utils/order';
 import SkeletonLoader from '../components/SkeletonLoader';
 
 const OrdersScreen = () => {
+  const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [activeTab, setActiveTab] = useState('All');
   const [search, setSearch] = useState('');
-  const [selectedOrder, setSelectedOrder] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  
-  // Tracking inputs for shipping
-  const [trackingNumber, setTrackingNumber] = useState('');
-  const [courierPartner, setCourierPartner] = useState('');
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   async function loadOrders() {
@@ -43,55 +40,24 @@ const OrdersScreen = () => {
   const handleStatusChange = async (orderId, nextStatus) => {
     setIsUpdatingStatus(true);
     try {
-      let trackingInfo = null;
-      if (nextStatus === 'Shipped') {
-        if (!trackingNumber || !courierPartner) {
-          alert("Please enter both courier partner and tracking number.");
-          setIsUpdatingStatus(false);
-          return;
-        }
-        trackingInfo = { trackingNumber, courierPartner };
-      }
-
-      await updateOrderStatus(orderId, nextStatus, trackingInfo);
+      await updateOrderStatus(orderId, nextStatus);
       
       // Update local state to reflect change without refetching immediately
       setOrders(prevOrders => prevOrders.map(o => {
         if (o.id === orderId) {
           return {
             ...o,
-            fulfillment_status: nextStatus,
-            ...(trackingInfo ? {
-              tracking_number: trackingInfo.trackingNumber,
-              courier_partner: trackingInfo.courierPartner
-            } : {})
+            fulfillment_status: nextStatus
           };
         }
         return o;
       }));
-    
-    // Update the currently viewed order modal state too
-    if (selectedOrder && selectedOrder.id === orderId) {
-      setSelectedOrder(prev => ({
-        ...prev,
-        fulfillment_status: nextStatus,
-        ...(trackingInfo && {
-          tracking_number: trackingInfo.trackingNumber,
-          courier_partner: trackingInfo.courierPartner
-        })
-      }));
-      // Reset inputs
-      if (nextStatus === 'Shipped') {
-        setTrackingNumber('');
-        setCourierPartner('');
-      }
+    } catch (error) {
+      alert("Failed to update status.");
+    } finally {
+      setIsUpdatingStatus(false);
     }
-  } catch (error) {
-    alert("Failed to update status.");
-  } finally {
-    setIsUpdatingStatus(false);
-  }
-};
+  };
 
   // Filter orders by tab and search
   const filteredOrders = orders.filter(order => {
@@ -203,7 +169,7 @@ const OrdersScreen = () => {
 
                 <div className="order-item-footer">
                   <button 
-                    onClick={() => setSelectedOrder(order)} 
+                    onClick={() => navigate('/orders/' + order.id)} 
                     className="btn btn-secondary btn-sm"
                   >
                     View Details & Address
@@ -212,7 +178,7 @@ const OrdersScreen = () => {
                   <div className="fulfillment-actions">
                     {order.fulfillment_status === 'Processing' && (
                       <button 
-                        onClick={() => setSelectedOrder(order)} 
+                        onClick={() => navigate('/orders/' + order.id)} 
                         className="btn btn-primary btn-sm btn-action-ship"
                       >
                         <Truck size={14} /> Ship Order
@@ -234,184 +200,6 @@ const OrdersScreen = () => {
           </div>
         )}
       </div>
-
-      {/* Order Detail Modal */}
-      <AnimatePresence>
-        {selectedOrder && (
-          <div className="modal-overlay">
-            <motion.div 
-              className="modal-card order-detail-modal"
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-            >
-              <div className="modal-header">
-                <div>
-                  <h3>Order Details — {selectedOrder.id.split('-')[0]}</h3>
-                  <span className="modal-subtitle">Received on {new Date(selectedOrder.created_at).toLocaleString()}</span>
-                </div>
-                <button onClick={() => {
-                  setSelectedOrder(null);
-                  setTrackingNumber('');
-                  setCourierPartner('');
-                }} className="close-btn">
-                  <X size={20} />
-                </button>
-              </div>
-
-              <div className="modal-body-scroll">
-                <div className="detail-section-split">
-                  {/* Shipping information */}
-                  <div className="detail-shipping-card">
-                    <h4>Customer Shipping Address</h4>
-                    <div className="shipping-info-item">
-                      <MapPin size={18} className="shipping-icon" />
-                      <div>
-                        <strong>{selectedOrder.customer_name}</strong>
-                        <p>{selectedOrder.shipping_address}</p>
-                        {selectedOrder.customer_notes && (
-                           <p className="order-notes"><strong>Note:</strong> {selectedOrder.customer_notes}</p>
-                        )}
-                      </div>
-                    </div>
-                    {selectedOrder.customer_email && (
-                      <div className="shipping-info-item">
-                        <Mail size={18} className="shipping-icon" />
-                        <p>{selectedOrder.customer_email}</p>
-                      </div>
-                    )}
-                    {selectedOrder.customer_phone && (
-                      <div className="shipping-info-item">
-                        <span className="shipping-icon">📞</span>
-                        <p>{selectedOrder.customer_phone}</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Payment Details */}
-                  <div className="detail-payment-card">
-                    <h4>Fulfillment & Payment</h4>
-                    <div className="payment-row">
-                      <span>Payment Status:</span>
-                      <span className="badge badge-success">{selectedOrder.payment_status || 'Paid'}</span>
-                    </div>
-                    {selectedOrder.payment_method && (
-                      <div className="payment-row">
-                        <span>Method:</span>
-                        <span>{selectedOrder.payment_method}</span>
-                      </div>
-                    )}
-                    <div className="payment-row">
-                      <span>Fulfillment Status:</span>
-                      <span className={`badge ${
-                        selectedOrder.fulfillment_status === 'Delivered' ? 'badge-success' :
-                        selectedOrder.fulfillment_status === 'Shipped' ? 'badge-info' : 'badge-warning'
-                      }`}>
-                        {selectedOrder.fulfillment_status}
-                      </span>
-                    </div>
-                    
-                    {selectedOrder.tracking_number && (
-                      <div className="tracking-details">
-                        <p><strong>Courier:</strong> {selectedOrder.courier_partner}</p>
-                        <p><strong>Tracking #:</strong> {selectedOrder.tracking_number}</p>
-                      </div>
-                    )}
-
-                    <div className="payment-flow-updater">
-                      {selectedOrder.fulfillment_status === 'Processing' && (
-                        <div className="shipping-input-box">
-                          <h5>Enter Shipping Details</h5>
-                          <input 
-                            type="text" 
-                            placeholder="Courier Partner (e.g. BlueDart)"
-                            value={courierPartner}
-                            onChange={e => setCourierPartner(e.target.value)}
-                            className="tracking-input"
-                          />
-                          <input 
-                            type="text" 
-                            placeholder="Tracking Number"
-                            value={trackingNumber}
-                            onChange={e => setTrackingNumber(e.target.value)}
-                            className="tracking-input"
-                          />
-                          <button 
-                            onClick={() => handleStatusChange(selectedOrder.id, 'Shipped')} 
-                            disabled={isUpdatingStatus}
-                            className="btn btn-primary w-full"
-                          >
-                            <Truck size={16} /> Mark as Shipped
-                          </button>
-                        </div>
-                      )}
-                      {selectedOrder.fulfillment_status === 'Shipped' && (
-                        <button 
-                          onClick={() => handleStatusChange(selectedOrder.id, 'Delivered')} 
-                          disabled={isUpdatingStatus}
-                          className="btn btn-primary w-full"
-                        >
-                          <CheckCircle size={16} /> Mark as Fully Delivered
-                        </button>
-                      )}
-                      {selectedOrder.fulfillment_status === 'Delivered' && (
-                        <div className="success-delivery-badge">
-                          <CheckCircle size={18} /> Payout credited to your balance
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Items Breakdown Table */}
-                <div className="order-breakdown-container">
-                  <h4>Ordered Products Breakdown</h4>
-                  <table className="breakdown-table">
-                    <thead>
-                      <tr>
-                        <th>Product Item</th>
-                        <th>Price</th>
-                        <th>Quantity</th>
-                        <th>Subtotal</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedOrder.items && selectedOrder.items.map((item, idx) => (
-                        <tr key={idx}>
-                          <td>{item.productName || item.name}</td>
-                          <td>₹{item.price}</td>
-                          <td>{item.quantity} units</td>
-                          <td>₹{item.price * item.quantity}</td>
-                        </tr>
-                      ))}
-                      {parseFloat(selectedOrder.shipping_fee || 0) > 0 && (
-                        <tr className="breakdown-fee-row">
-                          <td colSpan="3">Shipping Fee</td>
-                          <td>₹{selectedOrder.shipping_fee}</td>
-                        </tr>
-                      )}
-                      <tr className="breakdown-total-row">
-                        <td colSpan="3">Total Grand Amount</td>
-                        <td className="grand-total">₹{selectedOrder.total_amount}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              <div className="modal-footer">
-                <button 
-                  type="button" 
-                  onClick={() => setSelectedOrder(null)} 
-                  className="btn btn-secondary"
-                >
-                  Close
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       <style>{`
         .orders-screen {

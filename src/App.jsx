@@ -6,6 +6,7 @@ import AuthScreen from './screens/AuthScreen';
 import DashboardHome from './screens/DashboardHome';
 import InventoryScreen from './screens/InventoryScreen';
 import OrdersScreen from './screens/OrdersScreen';
+import OrderDetailsScreen from './screens/OrderDetailsScreen';
 import AnalyticsScreen from './screens/AnalyticsScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import { getSellerSession } from './utils/auth';
@@ -82,6 +83,15 @@ function App() {
             element={
               <DashboardLayout onLogout={handleLogoutSuccess}>
                 <OrdersScreen />
+              </DashboardLayout>
+            } 
+          />
+          
+          <Route 
+            path="/orders/:orderId" 
+            element={
+              <DashboardLayout onLogout={handleLogoutSuccess}>
+                <OrderDetailsScreen />
               </DashboardLayout>
             } 
           />
