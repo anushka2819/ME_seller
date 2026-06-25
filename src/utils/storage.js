@@ -40,6 +40,27 @@ export const getAnalyticsStats = (products = [], orders = []) => {
     .filter(o => o.fulfillment_status === 'Delivered')
     .reduce((sum, o) => sum + (o.items ? o.items.reduce((itemSum, item) => itemSum + (item.quantity || 1), 0) : 0), 0);
 
+
+  const deliveredOrders = orders.filter(o => o.fulfillment_status === 'Delivered');
+
+  const itemsSoldThisMonth = deliveredOrders
+    .filter(o => new Date(o.created_at) >= currentMonthStart)
+    .reduce((sum, o) => sum + (o.items ? o.items.reduce((itemSum, item) => itemSum + (item.quantity || 1), 0) : 0), 0);
+
+  const itemsSoldLastMonth = deliveredOrders
+    .filter(o => {
+      const d = new Date(o.created_at);
+      return d >= lastMonthStart && d <= lastMonthEnd;
+    })
+    .reduce((sum, o) => sum + (o.items ? o.items.reduce((itemSum, item) => itemSum + (item.quantity || 1), 0) : 0), 0);
+
+  let itemsSoldTrend = 0;
+  if (itemsSoldLastMonth > 0) {
+    itemsSoldTrend = parseFloat((((itemsSoldThisMonth - itemsSoldLastMonth) / itemsSoldLastMonth) * 100).toFixed(1));
+  } else if (itemsSoldThisMonth > 0) {
+    itemsSoldTrend = 100;
+  }
+
   // Generate some monthly earnings data for chart
   const monthlyRevenue = [
     { name: 'Jan', revenue: 4000 },
@@ -62,9 +83,10 @@ export const getAnalyticsStats = (products = [], orders = []) => {
     pendingOrders,
     outOfStockItems,
     monthlyRevenue,
-    activeListingsCount: products.filter(p => p.status === 'active').length,
+    activeListingsCount: products.filter(p => p.status === 'active').length, //check this
     totalViews,
     conversionRate,
-    earningsTrend
+    earningsTrend,
+    itemsSoldTrend
   };
 };

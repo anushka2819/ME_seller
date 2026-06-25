@@ -123,8 +123,9 @@ const AnalyticsScreen = () => {
           <div>
             <span>Total Units Sold</span>
             <h3>{stats.totalItemsSold}</h3>
-            <p className="trend-label positive">
-              <TrendingUp size={12} /> +8.4% month-over-month
+            <p className={`trend-label ${stats.itemsSoldTrend >= 0 ? 'positive' : 'negative'}`}>
+              {stats.itemsSoldTrend >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+              {stats.itemsSoldTrend > 0 ? '+' : ''}{stats.itemsSoldTrend}% compared to last month
             </p>
           </div>
         </div>
@@ -318,6 +319,10 @@ const AnalyticsScreen = () => {
 
         .trend-label.positive {
           color: var(--success);
+        }
+
+        .trend-label.negative {
+          color: var(--danger);
         }
 
         .analytics-layout-split {
