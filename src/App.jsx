@@ -8,7 +8,6 @@ import InventoryScreen from './screens/InventoryScreen';
 import OrdersScreen from './screens/OrdersScreen';
 import AnalyticsScreen from './screens/AnalyticsScreen';
 import SettingsScreen from './screens/SettingsScreen';
-import { initStorage } from './utils/storage';
 import { getSellerSession } from './utils/auth';
 import { supabase } from './utils/supabaseClient';
 
@@ -17,9 +16,6 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Initialize dummy DB values in localStorage (orders mock data)
-    initStorage();
-    
     const checkSession = async () => {
       try {
         const session = await getSellerSession();

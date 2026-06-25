@@ -36,7 +36,7 @@ export const getAnalyticsStats = (products = [], orders = [], productViews = [])
     .filter(o => o.fulfillment_status === 'Delivered')
     .reduce((sum, o) => sum + (o.items ? o.items.reduce((itemSum, item) => itemSum + (item.quantity || 1), 0) : 0), 0);
 
-
+  // items sold trend
   const deliveredOrders = orders.filter(o => o.fulfillment_status === 'Delivered');
 
   const itemsSoldThisMonth = deliveredOrders
