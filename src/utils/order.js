@@ -57,3 +57,26 @@ export const updateOrderStatus = async (orderId, newStatus, trackingInfo = null)
     throw error;
   }
 };
+
+// Fetch a single order by ID
+export const getOrderById = async (orderId) => {
+  try {
+    const session = await getSellerSession();
+    if (!session) throw new Error("No active seller session");
+
+    const { data, error } = await supabase
+      .schema('marketplace_dataspace')
+      .from('orders')
+      .select('*')
+      .eq('id', orderId)
+      .eq('seller_id', session.id)
+      .single();
+
+    if (error) throw error;
+    
+    return data;
+  } catch (error) {
+    console.error("Error fetching single order:", error);
+    return null;
+  }
+};

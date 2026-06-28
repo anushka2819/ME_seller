@@ -6,9 +6,9 @@ import AuthScreen from './screens/AuthScreen';
 import DashboardHome from './screens/DashboardHome';
 import InventoryScreen from './screens/InventoryScreen';
 import OrdersScreen from './screens/OrdersScreen';
+import OrderDetailsScreen from './screens/OrderDetailsScreen';
 import AnalyticsScreen from './screens/AnalyticsScreen';
 import SettingsScreen from './screens/SettingsScreen';
-import { initStorage } from './utils/storage';
 import { getSellerSession } from './utils/auth';
 import { supabase } from './utils/supabaseClient';
 
@@ -17,9 +17,6 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Initialize dummy DB values in localStorage (orders mock data)
-    initStorage();
-    
     const checkSession = async () => {
       try {
         const session = await getSellerSession();
@@ -86,6 +83,15 @@ function App() {
             element={
               <DashboardLayout onLogout={handleLogoutSuccess}>
                 <OrdersScreen />
+              </DashboardLayout>
+            } 
+          />
+          
+          <Route 
+            path="/orders/:orderId" 
+            element={
+              <DashboardLayout onLogout={handleLogoutSuccess}>
+                <OrderDetailsScreen />
               </DashboardLayout>
             } 
           />

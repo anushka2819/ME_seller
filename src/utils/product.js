@@ -145,3 +145,26 @@ export const deleteProduct = async (id) => {
     throw error;
   }
 };
+
+// Quick-update only the stock for a product
+export const updateProductStock = async (productId, newStock) => {
+  try {
+    const session = await getSellerSession();
+    if (!session) throw new Error("No active seller session");
+
+    const { data, error } = await supabase
+      .schema('marketplace_dataspace')
+      .from('products')
+      .update({ stock: newStock })
+      .eq('id', productId)
+      .eq('seller_id', session.id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error("Error updating product stock:", error);
+    throw error;
+  }
+};
