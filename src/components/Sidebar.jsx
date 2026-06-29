@@ -4,6 +4,7 @@ import {
   LayoutDashboard, 
   ShoppingBag, 
   ClipboardList, 
+  ReceiptText,
   BarChart3, 
   Settings, 
   LogOut, 
@@ -46,6 +47,7 @@ const Sidebar = ({ onLogout }) => {
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'My Products', path: '/products', icon: ShoppingBag },
     { name: 'Orders', path: '/orders', icon: ClipboardList },
+    { name: 'Transactions', path: '/transactions', icon: ReceiptText },
     { name: 'Analytics', path: '/analytics', icon: BarChart3 },
     { name: 'Shop Settings', path: '/settings', icon: Settings },
   ];

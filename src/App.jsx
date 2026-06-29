@@ -7,6 +7,7 @@ import DashboardHome from './screens/DashboardHome';
 import InventoryScreen from './screens/InventoryScreen';
 import OrdersScreen from './screens/OrdersScreen';
 import OrderDetailsScreen from './screens/OrderDetailsScreen';
+import TransactionsScreen from './screens/TransactionsScreen';
 import AnalyticsScreen from './screens/AnalyticsScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import { getSellerSession } from './utils/auth';
@@ -92,6 +93,15 @@ function App() {
             element={
               <DashboardLayout onLogout={handleLogoutSuccess}>
                 <OrderDetailsScreen />
+              </DashboardLayout>
+            } 
+          />
+
+          <Route 
+            path="/transactions" 
+            element={
+              <DashboardLayout onLogout={handleLogoutSuccess}>
+                <TransactionsScreen />
               </DashboardLayout>
             } 
           />

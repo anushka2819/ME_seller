@@ -141,7 +141,7 @@ const DashboardHome = () => {
             sub: 'From completed orders', 
             icon: IndianRupee,
             color: 'accent',
-            action: () => navigate('/analytics')
+            action: () => navigate('/transactions')
           },
           { 
             title: 'Items Sold', 
