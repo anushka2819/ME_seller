@@ -34,6 +34,11 @@ const InventoryScreen = () => {
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [price, setPrice] = useState('');
   const [stock, setStock] = useState('');
+  const [sizeVariants, setSizeVariants] = useState('');
+  const [length, setLength] = useState('');
+  const [width, setWidth] = useState('');
+  const [height, setHeight] = useState('');
+  const [weight, setWeight] = useState('');
   const [images, setImages] = useState([]); // Existing URLs
   const [imageFiles, setImageFiles] = useState([]); // New file uploads
   const [isSaving, setIsSaving] = useState(false);
@@ -57,6 +62,11 @@ const InventoryScreen = () => {
     setCategory(CATEGORIES[0]);
     setPrice('');
     setStock('');
+    setSizeVariants('');
+    setLength('');
+    setWidth('');
+    setHeight('');
+    setWeight('');
     setImages([]);
     setImageFiles([]);
     setStatus('active');
@@ -70,6 +80,11 @@ const InventoryScreen = () => {
     setCategory(prod.category);
     setPrice(prod.price);
     setStock(prod.stock);
+    setSizeVariants(prod.size_variants ? prod.size_variants.join(', ') : '');
+    setLength(prod.length || '');
+    setWidth(prod.width || '');
+    setHeight(prod.height || '');
+    setWeight(prod.weight || '');
     setImages(prod.images ? [...prod.images] : []);
     setImageFiles([]);
     setStatus(prod.status);
@@ -105,8 +120,8 @@ const InventoryScreen = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!name.trim() || price === '' || price === null || stock === '' || stock === null) {
-      alert("Please fill out all required fields (Name, Price, and Stock).");
+    if (!name.trim() || price === '' || price === null || stock === '' || stock === null || weight === '' || length === '' || width === '' || height === '') {
+      alert("Please fill out all required fields (Name, Price, Stock, Weight, Dimensions).");
       return;
     }
 
@@ -133,7 +148,12 @@ const InventoryScreen = () => {
         price: parseFloat(price),
         stock: parseInt(stock),
         images: finalImages,
-        status
+        status,
+        size_variants: sizeVariants ? sizeVariants.split(',').map(s => s.trim()).filter(Boolean) : [],
+        length: length ? parseFloat(length) : null,
+        width: width ? parseFloat(width) : null,
+        height: height ? parseFloat(height) : null,
+        weight: weight ? parseFloat(weight) : null
       };
 
       if (editingProduct) {
@@ -411,6 +431,79 @@ const InventoryScreen = () => {
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                   ></textarea>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="prod-size-variants">Size Variants</label>
+                  <input
+                    type="text"
+                    id="prod-size-variants"
+                    className="form-input"
+                    placeholder="e.g. S, M, L, XL (comma separated)"
+                    value={sizeVariants}
+                    onChange={(e) => setSizeVariants(e.target.value)}
+                  />
+                </div>
+
+                <h4 style={{ marginBottom: '10px', fontSize: '1rem', color: 'var(--text-primary)' }}>Logistics Details (India Post)</h4>
+                <div className="form-double-column">
+                  <div className="form-group">
+                    <label htmlFor="prod-weight">Weight (g) *</label>
+                    <input
+                      type="number"
+                      id="prod-weight"
+                      className="form-input"
+                      placeholder="e.g. 500"
+                      min="0"
+                      value={weight}
+                      onChange={(e) => setWeight(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="prod-length">Length (cm) *</label>
+                    <input
+                      type="number"
+                      id="prod-length"
+                      className="form-input"
+                      placeholder="e.g. 15"
+                      min="0"
+                      step="0.1"
+                      value={length}
+                      onChange={(e) => setLength(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="form-double-column">
+                  <div className="form-group">
+                    <label htmlFor="prod-width">Width (cm) *</label>
+                    <input
+                      type="number"
+                      id="prod-width"
+                      className="form-input"
+                      placeholder="e.g. 10"
+                      min="0"
+                      step="0.1"
+                      value={width}
+                      onChange={(e) => setWidth(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="prod-height">Height (cm) *</label>
+                    <input
+                      type="number"
+                      id="prod-height"
+                      className="form-input"
+                      placeholder="e.g. 5"
+                      min="0"
+                      step="0.1"
+                      value={height}
+                      onChange={(e) => setHeight(e.target.value)}
+                      required
+                    />
+                  </div>
                 </div>
 
                 <div className="form-group">
