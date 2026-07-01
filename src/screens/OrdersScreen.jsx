@@ -69,13 +69,20 @@ const OrdersScreen = () => {
   });
 
   const getFulfillmentIcon = (status) => {
+    const normalized = (status || '').toLowerCase();
     switch (status) {
       case 'Processing': return <Box size={14} />;
+      case 'Packed': return <Box size={14} />;
       case 'Shipped': return <Truck size={14} />;
+      case 'In Transit': return <Truck size={14} />;
       case 'Delivered': return <CheckCircle size={14} />;
-      default: return null;
+      default:
+        if (normalized === 'in transit') return <Truck size={14} />;
+        return null;
     }
   };
+
+  const orderStatusTabs = ['All', 'Processing', 'Packed', 'Shipped', 'In Transit', 'Delivered'];
 
   return (
     <div className="orders-screen">
@@ -89,7 +96,7 @@ const OrdersScreen = () => {
       {/* Tabs and Search Bar */}
       <div className="orders-controls card">
         <div className="orders-tabs">
-          {['All', 'Processing', 'Shipped', 'Delivered'].map(tab => (
+          {orderStatusTabs.map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}

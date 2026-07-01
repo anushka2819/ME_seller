@@ -6,10 +6,45 @@ import {
   MapPin, 
   Mail, 
   Truck,
-  CheckCircle
+  CheckCircle,
+  Package,
+  RotateCw,
+  CircleDashed
 } from 'lucide-react';
 import { getOrderById, updateOrderStatus } from '../utils/order';
 import SkeletonLoader from '../components/SkeletonLoader';
+
+const TRACKING_STEPS = [
+  { value: 'Processing', label: 'Order Placed' },
+  { value: 'Packed', label: 'Order Packed' },
+  { value: 'Shipped', label: 'Order Shipped' },
+  { value: 'In Transit', label: 'In Transit' },
+  { value: 'Delivered', label: 'Delivered' }
+];
+
+const normalizeTrackingStatus = (status = '') => {
+  const normalized = status.toLowerCase().trim();
+
+  if (['processing', 'placed', 'order placed'].includes(normalized)) return 'Processing';
+  if (['packed', 'order packed'].includes(normalized)) return 'Packed';
+  if (['shipped', 'order shipped'].includes(normalized)) return 'Shipped';
+  if (['in transit', 'transit'].includes(normalized)) return 'In Transit';
+  if (['delivered', 'completed'].includes(normalized)) return 'Delivered';
+
+  return 'Processing';
+};
+
+const getTrackingStepIndex = (status) => {
+  const normalized = normalizeTrackingStatus(status);
+  const index = TRACKING_STEPS.findIndex(step => step.value === normalized);
+  return index === -1 ? 0 : index;
+};
+
+const getTrackingStepLabel = (status) => {
+  const normalized = normalizeTrackingStatus(status);
+  const step = TRACKING_STEPS.find(item => item.value === normalized);
+  return step ? step.label : 'Order Placed';
+};
 
 const OrderDetailsScreen = () => {
   const { orderId } = useParams();
@@ -20,6 +55,7 @@ const OrderDetailsScreen = () => {
   // Tracking inputs for shipping
   const [trackingNumber, setTrackingNumber] = useState('');
   const [courierPartner, setCourierPartner] = useState('');
+  const [selectedTrackingStatus, setSelectedTrackingStatus] = useState('Packed');
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   useEffect(() => {
@@ -28,6 +64,8 @@ const OrderDetailsScreen = () => {
       const data = await getOrderById(orderId);
       if (data) {
         setOrder(data);
+        const currentIndex = getTrackingStepIndex(data.fulfillment_status);
+        setSelectedTrackingStatus(TRACKING_STEPS[Math.min(currentIndex + 1, TRACKING_STEPS.length - 1)].value);
       } else {
         // If order not found or user lacks permission, navigate back
         navigate('/orders');
@@ -37,11 +75,20 @@ const OrderDetailsScreen = () => {
     if (orderId) loadOrder();
   }, [orderId, navigate]);
 
+  useEffect(() => {
+    if (!order) return;
+
+    const currentIndex = getTrackingStepIndex(order.fulfillment_status);
+    setSelectedTrackingStatus(TRACKING_STEPS[Math.min(currentIndex + 1, TRACKING_STEPS.length - 1)].value);
+  }, [order]);
+
   const handleStatusChange = async (nextStatus) => {
     setIsUpdatingStatus(true);
     try {
       let trackingInfo = null;
-      if (nextStatus === 'Shipped') {
+      const needsTrackingDetails = nextStatus === 'Shipped' || nextStatus === 'In Transit';
+
+      if (needsTrackingDetails) {
         if (!trackingNumber || !courierPartner) {
           alert("Please enter both courier partner and tracking number.");
           setIsUpdatingStatus(false);
@@ -61,7 +108,7 @@ const OrderDetailsScreen = () => {
         })
       });
 
-      if (nextStatus === 'Shipped') {
+      if (needsTrackingDetails) {
         setTrackingNumber('');
         setCourierPartner('');
       }
@@ -81,6 +128,9 @@ const OrderDetailsScreen = () => {
   }
 
   if (!order) return null; // handled by useEffect redirect
+
+  const currentTrackingIndex = getTrackingStepIndex(order.fulfillment_status);
+  const availableTrackingSteps = TRACKING_STEPS.slice(currentTrackingIndex + 1);
 
   return (
     <div className="order-details-screen">
@@ -143,11 +193,28 @@ const OrderDetailsScreen = () => {
             <div className="payment-row">
               <span>Fulfillment Status:</span>
               <span className={`badge ${
-                order.fulfillment_status === 'Delivered' ? 'badge-success' :
-                order.fulfillment_status === 'Shipped' ? 'badge-info' : 'badge-warning'
+                normalizeTrackingStatus(order.fulfillment_status) === 'Delivered' ? 'badge-success' :
+                normalizeTrackingStatus(order.fulfillment_status) === 'In Transit' ? 'badge-info' :
+                normalizeTrackingStatus(order.fulfillment_status) === 'Packed' ? 'badge-warning' : 'badge-warning'
               }`}>
-                {order.fulfillment_status}
+                {getTrackingStepLabel(order.fulfillment_status)}
               </span>
+            </div>
+
+            <div className="tracking-stepper">
+              {TRACKING_STEPS.map((step, idx) => {
+                const isDone = idx < currentTrackingIndex;
+                const isActive = idx === currentTrackingIndex;
+
+                return (
+                  <div key={step.value} className={`tracking-step ${isDone ? 'done' : ''} ${isActive ? 'active' : ''}`}>
+                    <div className="tracking-step-dot">
+                      {isDone ? <CheckCircle size={12} /> : isActive ? <CircleDashed size={12} /> : <Package size={12} />}
+                    </div>
+                    <span>{step.label}</span>
+                  </div>
+                );
+              })}
             </div>
             
             {order.tracking_number && (
@@ -158,9 +225,18 @@ const OrderDetailsScreen = () => {
             )}
 
             <div className="payment-flow-updater">
-              {order.fulfillment_status === 'Processing' && (
+              {availableTrackingSteps.length > 0 && (
                 <div className="shipping-input-box">
-                  <h5>Enter Shipping Details</h5>
+                  <h5>Update Tracking Status</h5>
+                  <select
+                    value={selectedTrackingStatus}
+                    onChange={(e) => setSelectedTrackingStatus(e.target.value)}
+                    className="tracking-input"
+                  >
+                    {availableTrackingSteps.map(step => (
+                      <option key={step.value} value={step.value}>{step.label}</option>
+                    ))}
+                  </select>
                   <input 
                     type="text" 
                     placeholder="Courier Partner (e.g. BlueDart)"
@@ -176,15 +252,16 @@ const OrderDetailsScreen = () => {
                     className="tracking-input"
                   />
                   <button 
-                    onClick={() => handleStatusChange('Shipped')} 
+                    onClick={() => handleStatusChange(selectedTrackingStatus)} 
                     disabled={isUpdatingStatus}
                     className="btn btn-primary w-full"
                   >
-                    <Truck size={16} /> Mark as Shipped
+                    {selectedTrackingStatus === 'Packed' ? <Package size={16} /> : selectedTrackingStatus === 'In Transit' ? <RotateCw size={16} /> : <Truck size={16} />}
+                    Update to {getTrackingStepLabel(selectedTrackingStatus)}
                   </button>
                 </div>
               )}
-              {order.fulfillment_status === 'Shipped' && (
+              {normalizeTrackingStatus(order.fulfillment_status) === 'Shipped' && (
                 <button 
                   onClick={() => handleStatusChange('Delivered')} 
                   disabled={isUpdatingStatus}
@@ -193,9 +270,14 @@ const OrderDetailsScreen = () => {
                   <CheckCircle size={16} /> Mark as Fully Delivered
                 </button>
               )}
-              {order.fulfillment_status === 'Delivered' && (
+              {normalizeTrackingStatus(order.fulfillment_status) === 'Delivered' && (
                 <div className="success-delivery-badge">
                   <CheckCircle size={18} /> Payout credited to your balance
+                </div>
+              )}
+              {currentTrackingIndex === 0 && (
+                <div className="tracking-hint">
+                  <Package size={16} /> Start tracking from Order Placed, then move through packing, shipping, transit, and delivery.
                 </div>
               )}
             </div>
@@ -329,6 +411,69 @@ const OrderDetailsScreen = () => {
           margin-bottom: 0.75rem;
         }
 
+        .tracking-stepper {
+          display: grid;
+          grid-template-columns: repeat(5, minmax(0, 1fr));
+          gap: 0.5rem;
+          margin-top: 1rem;
+          padding: 1rem;
+          border-radius: 12px;
+          background: var(--bg-secondary);
+          border: 1px solid var(--border);
+        }
+
+        .tracking-step {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 0.45rem;
+          text-align: center;
+          color: var(--text-secondary);
+          font-size: 0.75rem;
+          font-weight: 600;
+        }
+
+        .tracking-step-dot {
+          width: 30px;
+          height: 30px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: var(--bg-primary);
+          border: 1px solid var(--border);
+          color: var(--text-secondary);
+        }
+
+        .tracking-step.done .tracking-step-dot {
+          background: var(--success-soft);
+          color: var(--success);
+          border-color: var(--success);
+        }
+
+        .tracking-step.active {
+          color: var(--text-primary);
+        }
+
+        .tracking-step.active .tracking-step-dot {
+          background: var(--accent-soft);
+          color: var(--accent);
+          border-color: var(--accent);
+        }
+
+        .tracking-hint {
+          margin-top: 0.75rem;
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          font-size: 0.9rem;
+          color: var(--text-secondary);
+          padding: 0.75rem 1rem;
+          border-radius: 10px;
+          background: var(--bg-primary);
+          border: 1px dashed var(--border);
+        }
+
         .payment-flow-updater {
           margin-top: 1.5rem;
           padding-top: 1.5rem;
@@ -424,6 +569,12 @@ const OrderDetailsScreen = () => {
           border-color: var(--accent);
         }
 
+        .shipping-input-box .tracking-input:first-child {
+          appearance: none;
+          -webkit-appearance: none;
+          cursor: pointer;
+        }
+
         .tracking-details {
           margin-top: 1rem;
           padding-top: 0.75rem;
@@ -435,6 +586,18 @@ const OrderDetailsScreen = () => {
           margin-top: 0.5rem;
           font-style: italic;
           color: var(--me-brown);
+        }
+
+        @media (max-width: 900px) {
+          .tracking-stepper {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+        }
+
+        @media (max-width: 520px) {
+          .tracking-stepper {
+            grid-template-columns: 1fr;
+          }
         }
       `}</style>
     </div>
