@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <rect width="100" height="100" rx="20" fill="#461711"/>
+  <rect x="5" y="5" width="90" height="90" rx="15" fill="none" stroke="#ff7612" stroke-width="4"/>
+  <text x="50" y="65" font-family="'Montserrat', sans-serif" font-size="44" font-weight="900" fill="#FAF6F1" text-anchor="middle">ME</text>
+</svg>
