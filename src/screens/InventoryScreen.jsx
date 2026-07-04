@@ -814,6 +814,9 @@ const InventoryScreen = () => {
           max-width: 600px;
           box-shadow: var(--shadow-hover);
           overflow: hidden;
+          display: flex;
+          flex-direction: column;
+          max-height: 90vh;
         }
 
         .modal-header {
@@ -834,6 +837,7 @@ const InventoryScreen = () => {
 
         .modal-form {
           padding: 1.5rem;
+          overflow-y: auto;
         }
 
         .form-double-column {
