@@ -8,6 +8,7 @@ const AdminCommunitiesLayout = ({ children, onLogout }) => {
   const navigate = useNavigate();
   const [admin, setAdmin] = useState(null);
   const [forbidden, setForbidden] = useState(false);
+  const [showAdminMenu, setShowAdminMenu] = useState(false);
 
   useEffect(() => {
     const fetchSession = async () => {
@@ -182,9 +183,13 @@ const AdminCommunitiesLayout = ({ children, onLogout }) => {
             </span>
           </div>
 
-          <div className="topbar-actions">
-            <div className="topbar-profile" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <div style={{ textAlign: 'right' }}>
+          <div className="topbar-actions" style={{ position: 'relative' }}>
+            <div 
+              className="topbar-profile" 
+              onClick={() => setShowAdminMenu(!showAdminMenu)}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', padding: '0.5rem', borderRadius: '8px', transition: 'background 0.2s', ...(showAdminMenu ? { background: 'var(--bg-primary)' } : {}) }}
+            >
+              <div style={{ textAlign: 'right', display: 'none', '@media(minWidth: 768px)': { display: 'block' } }}>
                 <div style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)' }}>{admin.ownerName || 'Admin'}</div>
                 <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Super Admin</div>
               </div>
@@ -192,6 +197,47 @@ const AdminCommunitiesLayout = ({ children, onLogout }) => {
                 {admin.ownerName ? admin.ownerName.charAt(0).toUpperCase() : 'A'}
               </div>
             </div>
+
+            {/* Admin Details Dropdown */}
+            {showAdminMenu && (
+              <div className="admin-dropdown-menu" style={{ 
+                position: 'absolute', 
+                top: 'calc(100% + 5px)', 
+                right: 0, 
+                width: '280px', 
+                background: 'var(--bg-secondary)', 
+                borderRadius: '12px', 
+                border: '1px solid var(--border)', 
+                boxShadow: '0 10px 25px rgba(0,0,0,0.1)', 
+                padding: '1.5rem',
+                zIndex: 1000
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '1rem', marginBottom: '1rem' }}>
+                  <div style={{ width: '50px', height: '50px', borderRadius: '50%', background: 'var(--accent)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                    {admin.ownerName ? admin.ownerName.charAt(0).toUpperCase() : 'A'}
+                  </div>
+                  <div>
+                    <h4 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '1rem' }}>{admin.ownerName || 'Admin'}</h4>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'inline-block', background: 'rgba(255, 154, 68, 0.1)', color: '#ff9a44', padding: '0.2rem 0.5rem', borderRadius: '4px', marginTop: '0.3rem' }}>Super Admin</span>
+                  </div>
+                </div>
+                
+                <div style={{ marginBottom: '0.5rem' }}>
+                  <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Email:</span>
+                    <span style={{ color: 'var(--text-primary)', fontWeight: '500' }}>{admin.email || 'admin@marketplace.com'}</span>
+                  </p>
+                  <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Role ID:</span>
+                    <span style={{ color: 'var(--text-primary)', fontWeight: '500', fontFamily: 'monospace' }}>{admin.id?.substring(0,8) || 'ADMIN_AUTH'}</span>
+                  </p>
+                  <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Access Level:</span>
+                    <span style={{ color: 'var(--text-primary)', fontWeight: '500' }}>Global Management</span>
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </header>
 
