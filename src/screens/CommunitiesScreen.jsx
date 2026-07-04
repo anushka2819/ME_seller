@@ -1,29 +1,116 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Building2, IndianRupee, ShoppingBag, PackageCheck, TrendingUp, TrendingDown, MoreVertical, Search, Filter } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Building2, IndianRupee, ShoppingBag, PackageCheck, TrendingUp, TrendingDown, MoreVertical, Search, X } from 'lucide-react';
+import { getAllSellers, getAllProducts, getAllOrders } from '../utils/admin';
+import { supabase } from '../utils/supabaseClient';
+import SkeletonLoader from '../components/SkeletonLoader';
 
-const mockNGOs = [
-  { id: '1', name: 'Green Earth Initiative', revenue: 145000, itemsSold: 420, payoutBalance: 24000, status: 'Active', category: 'Environment', color: 'linear-gradient(135deg, #43e97b, #38f9d7)' },
-  { id: '2', name: 'Artisan Crafts Co.', revenue: 83200, itemsSold: 215, payoutBalance: 8000, status: 'Active', category: 'Handicrafts', color: 'linear-gradient(135deg, #fa709a, #fee140)' },
-  { id: '3', name: 'Tech For All', revenue: 251000, itemsSold: 890, payoutBalance: 45000, status: 'Active', category: 'Education', color: 'linear-gradient(135deg, #4facfe, #00f2fe)' },
-  { id: '4', name: 'Local Farmers Guild', revenue: 67200, itemsSold: 310, payoutBalance: 12000, status: 'Active', category: 'Agriculture', color: 'linear-gradient(135deg, #f83600, #f9d423)' },
-  { id: '5', name: 'Women Empowerment Hub', revenue: 198000, itemsSold: 560, payoutBalance: 32000, status: 'Active', category: 'Social Cause', color: 'linear-gradient(135deg, #FF6B6B, #FF8E53)' },
-  { id: '6', name: 'Vintage Books Society', revenue: 15200, itemsSold: 45, payoutBalance: 1500, status: 'Warning', category: 'Education', color: 'linear-gradient(135deg, #667eea, #764ba2)' },
+const colors = [
+  'linear-gradient(135deg, #43e97b, #38f9d7)',
+  'linear-gradient(135deg, #fa709a, #fee140)',
+  'linear-gradient(135deg, #4facfe, #00f2fe)',
+  'linear-gradient(135deg, #f83600, #f9d423)',
+  'linear-gradient(135deg, #FF6B6B, #FF8E53)',
+  'linear-gradient(135deg, #667eea, #764ba2)'
 ];
+
+const getGradient = (index) => colors[index % colors.length];
 
 const CommunitiesScreen = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
+  const [sellers, setSellers] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const filteredNGOs = mockNGOs.filter(c => 
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+  const [showRevenueModal, setShowRevenueModal] = useState(false);
+
+  const fetchData = async () => {
+    setIsLoading(true);
+    try {
+      const [allSellers, allProducts, allOrders] = await Promise.all([
+        getAllSellers(),
+        getAllProducts(),
+        getAllOrders()
+      ]);
+      setSellers(allSellers);
+      setProducts(allProducts);
+      setOrders(allOrders);
+    } catch (err) {
+      console.error('Error fetching communities data:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+
+    // Subscribe to new sellers (NGOs) registering in realtime
+    const channel = supabase
+      .channel('sellers-insert')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'marketplace_dataspace',
+          table: 'sellers'
+        },
+        (payload) => {
+          console.log('New NGO registered:', payload.new);
+          // Re-fetch to seamlessly display the new NGO
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  // Filter out admin sellers and process business metrics
+  const processedNGOs = sellers
+    .filter(s => !s.is_admin)
+    .map((s, index) => {
+      const sellerProducts = products.filter(p => p.seller_id === s.id);
+      const sellerOrders = orders.filter(o => o.seller_id === s.id && (o.fulfillment_status === 'Delivered' || o.fulfillment_status === 'Shipped'));
+      const orderRevenue = sellerOrders.reduce((acc, o) => acc + parseFloat(o.total_amount || 0), 0);
+      
+      const itemsSold = sellerOrders.reduce((total, o) => {
+        if (Array.isArray(o.items)) {
+          return total + o.items.reduce((s, i) => s + (parseInt(i.quantity) || 1), 0);
+        }
+        return total;
+      }, 0);
+
+      const revenue = orderRevenue;
+
+      return {
+        id: s.id,
+        name: s.shop_name || 'Unnamed NGO',
+        owner: s.owner_name || 'N/A',
+        revenue,
+        itemsSold,
+        payoutBalance: s.balance || 0,
+        status: sellerProducts.length > 0 ? 'Active' : 'Onboarding',
+        category: s.category || 'General',
+        logo: s.logo,
+        color: getGradient(index)
+      };
+    });
+
+  const filteredNGOs = processedNGOs.filter(c =>
+    c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const totalPlatformRevenue = mockNGOs.reduce((acc, ngo) => acc + ngo.revenue, 0);
-  const totalItemsSold = mockNGOs.reduce((acc, ngo) => acc + ngo.itemsSold, 0);
-  const totalPendingPayouts = mockNGOs.reduce((acc, ngo) => acc + ngo.payoutBalance, 0);
+  const totalPlatformRevenue = processedNGOs.reduce((acc, ngo) => acc + ngo.revenue, 0);
+  const totalItemsSold = processedNGOs.reduce((acc, ngo) => acc + ngo.itemsSold, 0);
+  const totalPendingPayouts = processedNGOs.reduce((acc, ngo) => acc + ngo.payoutBalance, 0);
+  const sellersAwaitingPayout = processedNGOs.filter(ngo => ngo.payoutBalance > 0).length;
 
   return (
     <div className="communities-dashboard">
@@ -32,133 +119,145 @@ const CommunitiesScreen = () => {
           <h1 className="page-title">NGOs / Sellers Directory</h1>
           <p className="page-subtitle">Monitor e-commerce performance and payouts across all registered communities.</p>
         </div>
-        <button className="create-btn">
-          + Onboard NGO
-        </button>
       </div>
 
-      {/* Global Stats Cards */}
-      <div className="stats-grid">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="stat-card"
-        >
-          <div className="stat-icon-wrapper" style={{ background: 'rgba(79, 172, 254, 0.15)', color: '#4facfe' }}>
-            <IndianRupee size={24} />
-          </div>
-          <div className="stat-content">
-            <p className="stat-label">Total Platform Revenue</p>
-            <h3 className="stat-value">₹{totalPlatformRevenue.toLocaleString('en-IN')}</h3>
-            <p className="stat-change positive">
-              <TrendingUp size={14} /> +15% vs last month
-            </p>
-          </div>
-        </motion.div>
-
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="stat-card"
-        >
-          <div className="stat-icon-wrapper" style={{ background: 'rgba(67, 233, 123, 0.15)', color: '#43e97b' }}>
-            <PackageCheck size={24} />
-          </div>
-          <div className="stat-content">
-            <p className="stat-label">Total Items Sold</p>
-            <h3 className="stat-value">{totalItemsSold.toLocaleString('en-IN')}</h3>
-            <p className="stat-change positive">
-              <TrendingUp size={14} /> +8% vs last month
-            </p>
-          </div>
-        </motion.div>
-
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="stat-card"
-        >
-          <div className="stat-icon-wrapper" style={{ background: 'rgba(255, 154, 68, 0.15)', color: '#FF9A44' }}>
-            <Building2 size={24} />
-          </div>
-          <div className="stat-content">
-            <p className="stat-label">Pending Payouts</p>
-            <h3 className="stat-value">₹{totalPendingPayouts.toLocaleString('en-IN')}</h3>
-            <p className="stat-change negative">
-              <TrendingDown size={14} /> 12 Sellers awaiting
-            </p>
-          </div>
-        </motion.div>
-      </div>
-
-      {/* Toolbar */}
-      <div className="toolbar">
-        <div className="search-bar">
-          <Search size={18} className="search-icon" />
-          <input 
-            type="text" 
-            placeholder="Search NGOs by shop name or category..." 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+      {isLoading ? (
+        <div style={{ padding: '2rem 0' }}>
+          <SkeletonLoader type="card" count={3} />
         </div>
-        <button className="filter-btn">
-          <Filter size={18} />
-          Filter
-        </button>
-      </div>
+      ) : (
+        <>
+          {/* Global Stats Cards */}
+          <div className="stats-grid">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="stat-card"
+              style={{ cursor: 'pointer' }}
+              onClick={() => navigate('/admin/communities/transactions')}
+              title="Click to view all transactions"
+            >
+              <div className="stat-icon-wrapper" style={{ background: 'rgba(79, 172, 254, 0.15)', color: '#4facfe' }}>
+                <IndianRupee size={24} />
+              </div>
+              <div className="stat-content">
+                <p className="stat-label">Total Platform Revenue</p>
+                <h3 className="stat-value">₹{totalPlatformRevenue.toLocaleString('en-IN')}</h3>
+                <p className="stat-change positive">
+                  <TrendingUp size={14} /> Live platform metrics
+                </p>
+              </div>
+            </motion.div>
 
-      {/* Communities Grid */}
-      <div className="communities-grid">
-        {filteredNGOs.map((ngo, index) => (
-          <motion.div 
-            key={ngo.id}
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.1 * index }}
-            className="community-card"
-            onClick={() => navigate(`/admin/communities/${ngo.id}`)}
-          >
-            <div className="community-card-header" style={{ background: ngo.color }}>
-              <div className="community-status">
-                <span className={`status-dot ${ngo.status.toLowerCase()}`}></span>
-                {ngo.status}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="stat-card"
+            >
+              <div className="stat-icon-wrapper" style={{ background: 'rgba(67, 233, 123, 0.15)', color: '#43e97b' }}>
+                <PackageCheck size={24} />
               </div>
-              <button className="more-btn" onClick={(e) => e.stopPropagation()}>
-                <MoreVertical size={18} />
-              </button>
+              <div className="stat-content">
+                <p className="stat-label">Total Items Sold</p>
+                <h3 className="stat-value">{totalItemsSold.toLocaleString('en-IN')}</h3>
+                <p className="stat-change positive">
+                  <TrendingUp size={14} /> Cumulative sales
+                </p>
+              </div>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="stat-card"
+            >
+              <div className="stat-icon-wrapper" style={{ background: 'rgba(255, 154, 68, 0.15)', color: '#FF9A44' }}>
+                <Building2 size={24} />
+              </div>
+              <div className="stat-content">
+                <p className="stat-label">Pending Payouts</p>
+                <h3 className="stat-value">₹{totalPendingPayouts.toLocaleString('en-IN')}</h3>
+                <p className="stat-change negative">
+                  <TrendingDown size={14} /> {sellersAwaitingPayout} Sellers awaiting
+                </p>
+              </div>
+            </motion.div>
+          </div>
+
+          {/* Toolbar */}
+          <div className="toolbar">
+            <div className="search-bar">
+              <Search size={18} className="search-icon" />
+              <input
+                type="text"
+                placeholder="Search NGOs by shop name or category..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
-            
-            <div className="community-card-body">
-              <div className="community-avatar">
-                {ngo.name.charAt(0)}
-              </div>
-              <h3 className="community-name">{ngo.name}</h3>
-              <p className="community-category">{ngo.category}</p>
-              
-              <div className="community-metrics">
-                <div className="metric">
-                  <span className="metric-label">Revenue</span>
-                  <span className="metric-value">₹{(ngo.revenue / 1000).toFixed(1)}k</span>
-                </div>
-                <div className="metric divider"></div>
-                <div className="metric">
-                  <span className="metric-label">Items Sold</span>
-                  <span className="metric-value">{ngo.itemsSold}</span>
-                </div>
-                <div className="metric divider"></div>
-                <div className="metric">
-                  <span className="metric-label">Payout Bal</span>
-                  <span className="metric-value warning">₹{(ngo.payoutBalance / 1000).toFixed(1)}k</span>
-                </div>
-              </div>
+
+          </div>
+
+          {/* Communities Grid */}
+          {filteredNGOs.length === 0 ? (
+            <div className="card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+              No NGOs or Communities registered on the platform matching search.
             </div>
-          </motion.div>
-        ))}
-      </div>
+          ) : (
+            <div className="communities-grid">
+              {filteredNGOs.map((ngo, index) => (
+                <motion.div
+                  key={ngo.id}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.1 * index }}
+                  className="community-card"
+                  onClick={() => navigate(`/admin/communities/${ngo.id}`)}
+                >
+                  <div className="community-card-header" style={{ background: ngo.color }}>
+                    <div className="community-status">
+                      <span className={`status-dot ${ngo.status === 'Active' ? 'active' : 'warning'}`}></span>
+                      {ngo.status}
+                    </div>
+                  </div>
+
+                  <div className="community-card-body">
+                    <div className="community-avatar">
+                      {ngo.logo || ngo.name === 'Mind Empowered Crafts' ? (
+                        <img src={ngo.logo || "/brand/logo.gif"} alt={`${ngo.name} Logo`} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                      ) : (
+                        ngo.name.charAt(0)
+                      )}
+                    </div>
+                    <h3 className="community-name">{ngo.name}</h3>
+                    <p className="community-category">{ngo.category}</p>
+
+                    <div className="community-metrics">
+                      <div className="metric">
+                        <span className="metric-label">Revenue</span>
+                        <span className="metric-value">₹{(ngo.revenue).toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="metric divider"></div>
+                      <div className="metric">
+                        <span className="metric-label">Items Sold</span>
+                        <span className="metric-value">{ngo.itemsSold}</span>
+                      </div>
+                      <div className="metric divider"></div>
+                      <div className="metric">
+                        <span className="metric-label">Payout Bal</span>
+                        <span className="metric-value warning">₹{(ngo.payoutBalance).toLocaleString('en-IN')}</span>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
 
       <style>{`
         .communities-dashboard {

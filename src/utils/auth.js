@@ -1,4 +1,5 @@
 import { supabase } from "./supabaseClient";
+import { createClient } from '@supabase/supabase-js';
 
 // get current session and fetch their seller profile from the database
 export const getSellerSession = async () => {
@@ -73,6 +74,50 @@ export const loginSeller = async (email, password) => {
         ifsc: sellerData.ifsc,
         aboutSeller: sellerData.about,
         is_admin: sellerData.is_admin || false
+    };
+};
+
+//Register Seller as Admin (without logging out current admin)
+export const registerSellerAsAdmin = async (email, password, shopDetails) => {
+    // Create a temporary client that doesn't save the session to local storage
+    const tempSupabase = createClient(
+        import.meta.env.VITE_SUPABASE_URL,
+        import.meta.env.VITE_SUPABASE_ANON_KEY,
+        { auth: { persistSession: false, autoRefreshToken: false } }
+    );
+
+    // Sign up using the temp client
+    const { data: authData, error: authError } = await tempSupabase.auth.signUp({
+        email,
+        password,
+    });
+    if (authError) throw authError;
+
+    // Insert shop details into sellers table using the main admin client
+    const { error: insertError } = await supabase
+        .schema('marketplace_dataspace')
+        .from('sellers')
+        .insert([
+            {
+                id: authData.user.id,
+                shop_name: shopDetails.shopName,
+                owner_name: shopDetails.ownerName,
+                category: shopDetails.category,
+                balance: 0.00,
+                logo: shopDetails.logo || null
+            }
+        ]);
+
+    if (insertError) throw insertError;
+
+    return {
+        id: authData.user.id,
+        email: authData.user.email,
+        shopName: shopDetails.shopName,
+        ownerName: shopDetails.ownerName,
+        category: shopDetails.category,
+        balance: 0.00,
+        is_admin: false
     };
 };
 

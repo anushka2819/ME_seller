@@ -136,7 +136,7 @@ const OrderDetailsScreen = () => {
     <div className="order-details-screen">
       <div className="orders-header">
         <div>
-          <button onClick={() => navigate('/orders')} className="btn btn-secondary btn-sm" style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <button onClick={() => navigate('/orders')} className="back-navigation-btn">
             <ArrowLeft size={16} /> Back to Orders
           </button>
           <h2>Order Details — {order.id.split('-')[0]}</h2>

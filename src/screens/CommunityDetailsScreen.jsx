@@ -1,75 +1,164 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  ArrowLeft, IndianRupee, PackageCheck, AlertTriangle, Store, Settings, AlertCircle, 
-  TrendingUp, Clock, Package, ShoppingCart, Filter, Search, MoreVertical 
+import {
+  ArrowLeft, IndianRupee, PackageCheck, AlertTriangle, Store, Settings, AlertCircle,
+  TrendingUp, Clock, Package, ShoppingCart, Search, Building, ShieldCheck
 } from 'lucide-react';
+import { getSellerDetails, processSellerPayout } from '../utils/admin';
+import SkeletonLoader from '../components/SkeletonLoader';
+import Toast, { useToast } from '../components/Toast';
 
-const mockNGOs = {
-  '1': { name: 'Green Earth Initiative', revenue: 145000, itemsSold: 420, payoutBalance: 24000, pendingOrders: 15, lowStock: 3, status: 'Active', category: 'Environment', color: 'linear-gradient(135deg, #43e97b, #38f9d7)', owner: 'John Doe', joinDate: 'Jan 2024' },
-  '2': { name: 'Artisan Crafts Co.', revenue: 83200, itemsSold: 215, payoutBalance: 8000, pendingOrders: 5, lowStock: 1, status: 'Active', category: 'Handicrafts', color: 'linear-gradient(135deg, #fa709a, #fee140)', owner: 'Jane Smith', joinDate: 'Mar 2024' },
+const colors = [
+  'linear-gradient(135deg, #43e97b, #38f9d7)',
+  'linear-gradient(135deg, #fa709a, #fee140)',
+  'linear-gradient(135deg, #4facfe, #00f2fe)',
+  'linear-gradient(135deg, #f83600, #f9d423)',
+  'linear-gradient(135deg, #FF6B6B, #FF8E53)',
+  'linear-gradient(135deg, #667eea, #764ba2)'
+];
+
+const getGradient = (index) => colors[index % colors.length];
+
+const getStringHash = (str) => {
+  let hash = 0;
+  if (!str) return hash;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return Math.abs(hash);
 };
-
-const mockProducts = [
-  { id: 'P01', name: 'Organic Cotton Tote', price: 450, stock: 45, status: 'In Stock', sales: 120 },
-  { id: 'P02', name: 'Bamboo Toothbrush Set', price: 299, stock: 12, status: 'Low Stock', sales: 340 },
-  { id: 'P03', name: 'Recycled Paper Notebook', price: 150, stock: 0, status: 'Out of Stock', sales: 89 },
-  { id: 'P04', name: 'Reusable Coffee Cup', price: 599, stock: 65, status: 'In Stock', sales: 45 },
-];
-
-const mockOrders = [
-  { id: '#ORD-8821', date: '2024-06-15', customer: 'Rahul Sharma', total: 1350, status: 'Pending', items: 3 },
-  { id: '#ORD-8822', date: '2024-06-14', customer: 'Priya Patel', total: 450, status: 'Shipped', items: 1 },
-  { id: '#ORD-8823', date: '2024-06-14', customer: 'Amit Kumar', total: 898, status: 'Delivered', items: 2 },
-  { id: '#ORD-8824', date: '2024-06-13', customer: 'Neha Singh', total: 2500, status: 'Delivered', items: 5 },
-];
 
 const CommunityDetailsScreen = () => {
   const { communityId } = useParams();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('overview'); // overview, products, orders
-  
-  const ngo = mockNGOs[communityId] || mockNGOs['1']; // Fallback for mock purposes
+  const [activeTab, setActiveTab] = useState('overview');
+  const [ngo, setNgo] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [productSearch, setProductSearch] = useState('');
+  const [orderSearch, setOrderSearch] = useState('');
+  const [isProcessingPayout, setIsProcessingPayout] = useState(false);
+  const { toast, showToast } = useToast();
+
+  const loadDetails = async () => {
+    setIsLoading(true);
+    try {
+      const data = await getSellerDetails(communityId);
+      if (data) {
+        const sellerProducts = data.products || [];
+        const sellerOrders = data.orders || [];
+
+        const itemsSold = sellerProducts.reduce((acc, p) => acc + (p.sales_count || 0), 0);
+        const orderRevenue = sellerOrders
+          .filter(o => o.fulfillment_status === 'Delivered' || o.fulfillment_status === 'Shipped')
+          .reduce((acc, o) => acc + parseFloat(o.total_amount || 0), 0);
+        const fallbackRevenue = sellerProducts.reduce((acc, p) => acc + (p.sales_count || 0) * (p.price || 0), 0);
+        const revenue = orderRevenue || fallbackRevenue;
+
+        const pendingOrders = sellerOrders.filter(o => o.fulfillment_status === 'Processing' || o.fulfillment_status === 'Pending').length;
+        const lowStock = sellerProducts.filter(p => (p.stock || 0) <= 5).length;
+
+        setNgo({
+          ...data.seller,
+          revenue,
+          itemsSold,
+          payoutBalance: data.seller.balance || 0,
+          pendingOrders,
+          lowStock,
+          status: sellerProducts.length > 0 ? 'Active' : 'Onboarding',
+          color: getGradient(getStringHash(data.seller.id))
+        });
+        setProducts(sellerProducts);
+        setOrders(sellerOrders);
+      }
+    } catch (err) {
+      console.error("Error loading NGO details:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (communityId) {
+      loadDetails();
+    }
+  }, [communityId]);
+
+  const handleProcessPayout = async () => {
+    if (!ngo || ngo.payoutBalance <= 0) return;
+    setIsProcessingPayout(true);
+    try {
+      await processSellerPayout(ngo.id);
+      showToast(`Payout of ₹${ngo.payoutBalance.toLocaleString('en-IN')} processed for ${ngo.shopName}!`, 'success');
+      await loadDetails();
+    } catch (err) {
+      console.error('Failed to process payout:', err);
+      showToast('Error processing payout. Please try again.', 'error');
+    } finally {
+      setIsProcessingPayout(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div style={{ padding: '2rem 0' }}>
+        <SkeletonLoader type="card" count={3} />
+      </div>
+    );
+  }
 
   if (!ngo) {
     return (
       <div className="not-found">
         <AlertCircle size={48} className="error-icon" />
         <h2>NGO Not Found</h2>
-        <button onClick={() => navigate('/admin/communities')} className="back-btn">
+        <button onClick={() => navigate('/admin/communities')} className="back-navigation-btn">
           Back to Directory
         </button>
       </div>
     );
   }
 
+  const filteredProducts = products.filter(p =>
+    (p.name || '').toLowerCase().includes(productSearch.toLowerCase()) ||
+    (p.category || '').toLowerCase().includes(productSearch.toLowerCase())
+  );
+
+  const filteredOrders = orders.filter(o =>
+    (o.id || '').toLowerCase().includes(orderSearch.toLowerCase()) ||
+    (o.customer_name || '').toLowerCase().includes(orderSearch.toLowerCase()) ||
+    (o.customer_email || '').toLowerCase().includes(orderSearch.toLowerCase())
+  );
+
   return (
     <div className="community-details">
       {/* Header Profile Section */}
       <div className="details-header">
-        <button className="back-nav-btn" onClick={() => navigate('/admin/communities')}>
+        <button className="back-navigation-btn" onClick={() => navigate('/admin/communities')}>
           <ArrowLeft size={18} /> Back to NGOs
         </button>
-        
+
         <div className="banner" style={{ background: ngo.color }}>
-          <div className="banner-actions">
-            <button className="action-btn"><Settings size={16} /> Manage Shop</button>
-          </div>
         </div>
-        
+
         <div className="profile-info-section">
           <div className="profile-avatar-large">
-            {ngo.name.charAt(0)}
+            {ngo.logo || ngo.shopName === 'Mind Empowered Crafts' ? (
+              <img src={ngo.logo || "/brand/logo.gif"} alt={`${ngo.shopName} Logo`} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '16px' }} />
+            ) : (
+              ngo.shopName.charAt(0)
+            )}
           </div>
           <div className="profile-text">
             <div className="title-row">
-              <h1 className="community-title">{ngo.name}</h1>
+              <h1 className="community-title">{ngo.shopName}</h1>
               <span className={`status-badge ${ngo.status.toLowerCase()}`}>{ngo.status}</span>
             </div>
             <p className="community-category">
-              <Store size={14} style={{ display: 'inline', marginRight: '4px' }} /> 
-              {ngo.category} • Operated by {ngo.owner} • Joined {ngo.joinDate}
+              <Store size={14} style={{ display: 'inline', marginRight: '4px' }} />
+              {ngo.category} • Operated by {ngo.ownerName || 'N/A'} • Joined {new Date(ngo.createdAt).toLocaleDateString()}
             </p>
           </div>
         </div>
@@ -79,10 +168,10 @@ const CommunityDetailsScreen = () => {
             Overview
           </button>
           <button className={`tab-btn ${activeTab === 'products' ? 'active' : ''}`} onClick={() => setActiveTab('products')}>
-            <Package size={16} /> Products ({mockProducts.length})
+            <Package size={16} /> Products ({products.length})
           </button>
           <button className={`tab-btn ${activeTab === 'orders' ? 'active' : ''}`} onClick={() => setActiveTab('orders')}>
-            <ShoppingCart size={16} /> Orders ({mockOrders.length})
+            <ShoppingCart size={16} /> Orders ({orders.length})
           </button>
         </div>
       </div>
@@ -97,16 +186,16 @@ const CommunityDetailsScreen = () => {
                 <div>
                   <p className="analytic-label">Total Revenue Generated</p>
                   <h4 className="analytic-value">₹{ngo.revenue.toLocaleString('en-IN')}</h4>
-                  <span className="analytic-trend positive"><TrendingUp size={12}/> +12% this month</span>
+                  <span className="analytic-trend positive"><TrendingUp size={12} /> Live business earnings</span>
                 </div>
               </div>
-              
+
               <div className="analytic-card">
                 <div className="analytic-icon color-success"><PackageCheck size={24} /></div>
                 <div>
                   <p className="analytic-label">Items Successfully Sold</p>
                   <h4 className="analytic-value">{ngo.itemsSold.toLocaleString('en-IN')}</h4>
-                  <span className="analytic-trend positive"><TrendingUp size={12}/> +5% this month</span>
+                  <span className="analytic-trend positive"><TrendingUp size={12} /> Product units sold</span>
                 </div>
               </div>
 
@@ -130,41 +219,87 @@ const CommunityDetailsScreen = () => {
                 </div>
                 <div className="revenue-chart-container">
                   <div className="bar-chart-visual">
-                    {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'].map((month, idx) => {
-                      const barHeight = 40 + (Math.random() * 50); // mock height
-                      return (
-                        <div key={month} className="chart-column">
-                          <div className="chart-column-bar-wrapper">
-                            <div className="chart-column-bar" style={{ height: `${barHeight}%` }}></div>
+                    {(() => {
+                      const now = new Date();
+                      const monthlyData = [];
+                      
+                      for (let i = 5; i >= 0; i--) {
+                        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                        monthlyData.push({
+                          month: d.getMonth(),
+                          year: d.getFullYear(),
+                          label: d.toLocaleDateString('en-IN', { month: 'short' }),
+                          total: 0
+                        });
+                      }
+                      
+                      orders.forEach(order => {
+                        if (!['Delivered', 'Shipped'].includes(order.fulfillment_status)) return;
+                        const d = new Date(order.created_at);
+                        const bucket = monthlyData.find(m => m.month === d.getMonth() && m.year === d.getFullYear());
+                        if (bucket) {
+                          bucket.total += parseFloat(order.total_amount || 0);
+                        }
+                      });
+                      
+                      const maxTotal = Math.max(...monthlyData.map(m => m.total), 1);
+                      
+                      return monthlyData.map((data, idx) => {
+                        const barHeight = Math.max((data.total / maxTotal) * 100, 2); // minimum 2% for visibility
+                        return (
+                          <div key={data.label + idx} className="chart-column">
+                            <div className="chart-column-bar-wrapper">
+                              <div 
+                                className="chart-column-bar" 
+                                style={{ height: `${barHeight}%` }} 
+                                title={`₹${data.total.toLocaleString('en-IN')}`}
+                              ></div>
+                            </div>
+                            <span className="chart-column-label">{data.label}</span>
                           </div>
-                          <span className="chart-column-label">{month}</span>
-                        </div>
-                      );
-                    })}
+                        );
+                      });
+                    })()}
                   </div>
                 </div>
               </div>
 
               <div className="card payout-card">
-                <div className="card-header">
-                  <h3>Financial Overview</h3>
-                </div>
+                <h3 className="payout-card-title">Financial Overview</h3>
                 <div className="payout-details">
+                  {/* Balance display */}
                   <div className="payout-balance-box">
-                    <span>Current Payout Balance</span>
-                    <h2>₹{ngo.payoutBalance.toLocaleString('en-IN')}</h2>
+                    <span className="balance-label">Current Payout Balance</span>
+                    <h2 className="balance-amount">₹{parseFloat(ngo.payoutBalance || 0).toLocaleString('en-IN')}</h2>
                   </div>
-                  <div className="payout-history">
-                    <h4>Recent Payouts</h4>
-                    <div className="history-item">
-                      <div className="history-info">
-                        <span className="history-date">Jun 15, 2024</span>
-                        <span className="history-status success">Completed</span>
-                      </div>
-                      <span className="history-amount">₹45,000</span>
+
+                  {/* Bank details */}
+                  <div className="bank-details-block">
+                    <div className="bank-details-head">
+                      <Building size={14} />
+                      <span>Registered Bank Account</span>
                     </div>
+                    <div className="bank-row"><span>Bank</span><strong>{ngo.bankName || 'Not set'}</strong></div>
+                    <div className="bank-row">
+                      <span>Account No.</span>
+                      <strong>{ngo.accountNumber ? `•••• ${ngo.accountNumber.slice(-4)}` : 'Not set'}</strong>
+                    </div>
+                    <div className="bank-row"><span>IFSC</span><strong>{ngo.ifsc || 'Not set'}</strong></div>
+                    {ngo.bankName && ngo.accountNumber && (
+                      <div className="bank-verified">
+                        <ShieldCheck size={12} /> Verified
+                      </div>
+                    )}
                   </div>
-                  <button className="btn-full-width">Process Payout</button>
+
+                  {/* Process payout button */}
+                  <button
+                    className={`btn-payout ${ngo.payoutBalance > 0 && ngo.bankName ? 'enabled' : 'disabled'}`}
+                    onClick={handleProcessPayout}
+                    disabled={isProcessingPayout || ngo.payoutBalance <= 0 || !ngo.bankName}
+                  >
+                    {isProcessingPayout ? 'Processing…' : ngo.payoutBalance <= 0 ? 'No Balance' : 'Process Payout'}
+                  </button>
                 </div>
               </div>
             </div>
@@ -177,7 +312,12 @@ const CommunityDetailsScreen = () => {
               <h3>Community Products</h3>
               <div className="search-box">
                 <Search size={16} />
-                <input type="text" placeholder="Search products..." />
+                <input
+                  type="text"
+                  placeholder="Search products..."
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                />
               </div>
             </div>
             <div className="table-responsive">
@@ -188,25 +328,34 @@ const CommunityDetailsScreen = () => {
                     <th>Price</th>
                     <th>Stock Level</th>
                     <th>Total Sales</th>
-                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {mockProducts.map(product => (
-                    <tr key={product.id}>
-                      <td className="font-medium">{product.name}</td>
-                      <td>₹{product.price}</td>
-                      <td>
-                        <span className={`status-badge ${product.stock > 10 ? 'active' : product.stock > 0 ? 'warning' : 'danger'}`}>
-                          {product.stock} in stock
-                        </span>
-                      </td>
-                      <td>{product.sales} units</td>
-                      <td>
-                        <button className="icon-btn"><MoreVertical size={16} /></button>
-                      </td>
+                  {filteredProducts.length === 0 ? (
+                    <tr>
+                      <td colSpan="4" style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem' }}>No products found.</td>
                     </tr>
-                  ))}
+                  ) : (
+                    filteredProducts.map(product => (
+                      <tr key={product.id}>
+                        <td className="font-medium" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          {product.images && product.images.length > 0 ? (
+                            <img src={product.images[0]} alt={product.name} style={{ width: '40px', height: '40px', borderRadius: '6px', objectFit: 'cover' }} />
+                          ) : (
+                            <div style={{ width: '40px', height: '40px', borderRadius: '6px', background: 'rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>📦</div>
+                          )}
+                          <span>{product.name}</span>
+                        </td>
+                        <td>₹{product.price.toLocaleString('en-IN')}</td>
+                        <td>
+                          <span className={`status-badge ${product.stock > 10 ? 'active' : product.stock > 0 ? 'warning' : 'danger'}`}>
+                            {product.stock} in stock
+                          </span>
+                        </td>
+                        <td>{product.sales_count || 0} units</td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -219,7 +368,12 @@ const CommunityDetailsScreen = () => {
               <h3>Community Orders</h3>
               <div className="search-box">
                 <Search size={16} />
-                <input type="text" placeholder="Search orders..." />
+                <input
+                  type="text"
+                  placeholder="Search orders..."
+                  value={orderSearch}
+                  onChange={(e) => setOrderSearch(e.target.value)}
+                />
               </div>
             </div>
             <div className="table-responsive">
@@ -229,26 +383,37 @@ const CommunityDetailsScreen = () => {
                     <th>Order ID</th>
                     <th>Date</th>
                     <th>Customer</th>
-                    <th>Items</th>
+                    <th>Items Count</th>
                     <th>Total Amount</th>
                     <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {mockOrders.map(order => (
-                    <tr key={order.id}>
-                      <td className="font-medium color-accent">{order.id}</td>
-                      <td>{order.date}</td>
-                      <td>{order.customer}</td>
-                      <td>{order.items} items</td>
-                      <td>₹{order.total}</td>
-                      <td>
-                        <span className={`status-badge ${order.status === 'Delivered' ? 'active' : order.status === 'Shipped' ? 'info' : 'warning'}`}>
-                          {order.status}
-                        </span>
-                      </td>
+                  {filteredOrders.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem' }}>No orders found.</td>
                     </tr>
-                  ))}
+                  ) : (
+                    filteredOrders.map(order => {
+                      const totalQty = order.items ? order.items.reduce((sum, item) => sum + (item.quantity || 1), 0) : 0;
+                      return (
+                        <tr key={order.id}>
+                          <td className="font-medium color-accent" onClick={() => navigate(`/orders/${order.id}`)} style={{ cursor: 'pointer' }}>
+                            {order.id.split('-')[0]}...
+                          </td>
+                          <td>{new Date(order.created_at).toLocaleDateString()}</td>
+                          <td>{order.customer_name || 'N/A'}</td>
+                          <td>{totalQty} items</td>
+                          <td>₹{(order.total_amount || 0).toLocaleString('en-IN')}</td>
+                          <td>
+                            <span className={`status-badge ${order.fulfillment_status === 'Delivered' ? 'active' : order.fulfillment_status === 'Shipped' ? 'info' : 'warning'}`}>
+                              {order.fulfillment_status || 'Pending'}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
@@ -545,11 +710,14 @@ const CommunityDetailsScreen = () => {
           max-width: 40px;
           display: flex;
           align-items: flex-end;
+          background: var(--chart-bar-track);
+          border-radius: 6px;
+          overflow: hidden;
         }
 
         .chart-column-bar {
           width: 100%;
-          background: linear-gradient(to top, var(--me-maroon), var(--me-orange));
+          background: var(--chart-bar);
           border-radius: 6px 6px 0 0;
         }
 
@@ -658,8 +826,63 @@ const CommunityDetailsScreen = () => {
         .table-card {
           background: var(--bg-secondary);
           border: 1px solid var(--border);
-          border-radius: 16px;
-          overflow: hidden;
+          border-radius: 6px;
+          cursor: pointer;
+        }
+
+        .manage-dropdown {
+          position: absolute;
+          top: calc(100% + 0.5rem);
+          right: 0;
+          background: var(--bg-primary);
+          border: 1px solid var(--border);
+          border-radius: 12px;
+          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+          width: 200px;
+          padding: 0.5rem;
+          z-index: 100;
+          display: flex;
+          flex-direction: column;
+          gap: 0.25rem;
+        }
+
+        .dropdown-item {
+          padding: 0.75rem 1rem;
+          background: transparent;
+          border: none;
+          color: var(--text-primary);
+          font-size: 0.9rem;
+          font-weight: 500;
+          text-align: left;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: background 0.2s ease;
+        }
+
+        .dropdown-item:hover {
+          background: var(--bg-secondary);
+        }
+
+        .dropdown-item.danger {
+          color: #EF4444;
+        }
+
+        .dropdown-item.danger:hover {
+          background: rgba(239, 68, 68, 0.1);
+        }
+
+        .dropdown-divider {
+          height: 1px;
+          background: var(--border);
+          margin: 0.25rem 0;
+        }
+
+        .profile-info-section {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 1.5rem;
+          border-bottom: 1px solid var(--border);
         }
 
         .table-toolbar {
@@ -736,7 +959,113 @@ const CommunityDetailsScreen = () => {
         .icon-btn:hover {
           color: var(--text-primary);
         }
+
+        /* Payout Card */
+        .payout-card-title {
+          font-size: 1.05rem;
+          font-weight: 700;
+          color: var(--text-primary);
+          font-family: 'Montserrat', sans-serif;
+          margin: 0 0 1.25rem 0;
+        }
+
+        .balance-label {
+          font-size: 0.78rem;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          font-weight: 600;
+          color: var(--text-secondary);
+          display: block;
+          margin-bottom: 0.4rem;
+        }
+
+        .balance-amount {
+          font-size: 2.2rem;
+          font-weight: 800;
+          font-family: 'Montserrat', sans-serif;
+          color: var(--text-primary);
+          margin: 0 0 1.25rem 0;
+        }
+
+        .bank-details-block {
+          background: var(--bg-primary);
+          border: 1px solid var(--border);
+          border-radius: 12px;
+          padding: 1rem;
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+          font-size: 0.85rem;
+          margin-bottom: 1.25rem;
+        }
+
+        .bank-details-head {
+          display: flex;
+          align-items: center;
+          gap: 0.4rem;
+          font-weight: 700;
+          font-size: 0.8rem;
+          color: var(--text-secondary);
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          margin-bottom: 0.25rem;
+        }
+
+        .bank-row {
+          display: flex;
+          justify-content: space-between;
+          color: var(--text-secondary);
+        }
+
+        .bank-row strong {
+          color: var(--text-primary);
+          font-weight: 600;
+        }
+
+        .bank-verified {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.3rem;
+          color: var(--success);
+          font-size: 0.76rem;
+          font-weight: 700;
+          margin-top: 0.25rem;
+        }
+
+        .btn-payout {
+          width: 100%;
+          padding: 0.85rem;
+          border: none;
+          border-radius: 10px;
+          font-weight: 700;
+          font-size: 0.95rem;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .btn-payout.enabled {
+          background: linear-gradient(135deg, var(--me-maroon), var(--me-orange));
+          color: white;
+          box-shadow: 0 4px 14px rgba(255, 118, 18, 0.3);
+        }
+
+        .btn-payout.enabled:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 6px 20px rgba(255, 118, 18, 0.4);
+        }
+
+        .btn-payout.disabled {
+          background: var(--border);
+          color: var(--text-secondary);
+          cursor: not-allowed;
+        }
       `}</style>
+
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        onClose={() => showToast('')}
+      />
     </div>
   );
 };
