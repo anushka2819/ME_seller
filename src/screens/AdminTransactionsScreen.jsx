@@ -37,7 +37,7 @@ const AdminTransactionsScreen = () => {
       const amount = parseFloat(o.total_amount || 0);
       return {
         id: o.id,
-        date: new Date(o.created_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
+        date: new Date(o.created_at).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
         shopName: seller ? (seller.shop_name || 'Unknown') : 'Unknown NGO',
         amount: amount,
         adminCut: amount * 0.05,

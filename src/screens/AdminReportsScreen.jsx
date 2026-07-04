@@ -180,7 +180,7 @@ const AdminReportsScreen = () => {
                   style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer', transition: 'background 0.2s', ':hover': { background: 'var(--bg-secondary)' } }}
                 >
                   <td style={{ padding: '1rem', fontSize: '0.9rem' }}>
-                    {new Date(report.created_at).toLocaleDateString()}
+                    {new Date(report.created_at).toLocaleDateString('en-GB')}
                   </td>
                   <td style={{ padding: '1rem', fontFamily: 'monospace', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                     {report.order_id?.substring(0, 8).toUpperCase()}...

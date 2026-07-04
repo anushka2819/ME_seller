@@ -236,7 +236,7 @@ const TransactionsScreen = () => {
                     <td>
                       <div className="transaction-date-cell">
                         <Calendar size={14} />
-                        <span>{new Date(row.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                        <span>{new Date(row.createdAt).toLocaleDateString('en-GB')}</span>
                       </div>
                     </td>
                     <td className="order-id-cell">{row.orderId.split('-')[0]}...</td>

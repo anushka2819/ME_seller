@@ -159,7 +159,7 @@ const CommunityDetailsScreen = () => {
             </div>
             <p className="community-category">
               <Store size={14} style={{ display: 'inline', marginRight: '4px' }} />
-              {ngo.category} • Operated by {ngo.ownerName || 'N/A'} • Joined {new Date(ngo.createdAt).toLocaleDateString()}
+              {ngo.category} • Operated by {ngo.ownerName || 'N/A'} • Joined {new Date(ngo.createdAt).toLocaleDateString('en-GB')}
             </p>
           </div>
         </div>
@@ -229,7 +229,7 @@ const CommunityDetailsScreen = () => {
                         monthlyData.push({
                           month: d.getMonth(),
                           year: d.getFullYear(),
-                          label: d.toLocaleDateString('en-IN', { month: 'short' }),
+                          label: d.toLocaleDateString('en-GB', { month: 'short' }),
                           total: 0
                         });
                       }
@@ -402,7 +402,7 @@ const CommunityDetailsScreen = () => {
                           <td className="font-medium color-accent" onClick={() => navigate(`/orders/${order.id}`)} style={{ cursor: 'pointer' }}>
                             {order.id.split('-')[0]}...
                           </td>
-                          <td>{new Date(order.created_at).toLocaleDateString()}</td>
+                          <td>{new Date(order.created_at).toLocaleDateString('en-GB')}</td>
                           <td>{order.customer_name || 'N/A'}</td>
                           <td>{totalQty} items</td>
                           <td>₹{(order.total_amount || 0).toLocaleString('en-IN')}</td>

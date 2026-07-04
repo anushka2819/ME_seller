@@ -128,7 +128,7 @@ const DashboardHome = () => {
           <p>Here is your shop's performance overview for today.</p>
         </div>
         <div className="banner-date">
-          <span>{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+          <span>{new Date().toLocaleDateString('en-GB')}</span>
         </div>
       </div>
 
@@ -383,7 +383,7 @@ const DashboardHome = () => {
                         <span className="customer-email">{order.customer_email || order.customer_phone}</span>
                       </div>
                     </td>
-                    <td>{new Date(order.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                    <td>{new Date(order.created_at).toLocaleDateString('en-GB')}</td>
                     <td>{order.items ? order.items.reduce((sum, item) => sum + item.quantity, 0) : 0} items</td>
                     <td className="order-amount">₹{parseFloat(order.total_amount || 0).toLocaleString('en-IN')}</td>
                     <td>

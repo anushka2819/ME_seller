@@ -16,7 +16,7 @@ const buildMonthlyRevenue = (orders, monthCount = 6) => {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     months.push({
       key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
-      label: d.toLocaleDateString('en-IN', { month: 'short' }),
+      label: d.toLocaleDateString('en-GB', { month: 'short' }),
       total: 0,
     });
   }

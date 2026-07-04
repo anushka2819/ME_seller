@@ -140,7 +140,7 @@ const OrderDetailsScreen = () => {
       <div className="orders-header">
         <div>
           <h2>Order Details — {order.id.split('-')[0]}</h2>
-          <p>Received on {new Date(order.created_at).toLocaleString()}</p>
+          <p>Received on {new Date(order.created_at).toLocaleString('en-GB')}</p>
         </div>
       </div>
 

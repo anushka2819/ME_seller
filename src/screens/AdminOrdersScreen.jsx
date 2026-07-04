@@ -227,9 +227,7 @@ const AdminOrdersScreen = () => {
                             <td>
                               <div className="date-cell">
                                 <Calendar size={13} />
-                                {new Date(order.created_at).toLocaleDateString('en-IN', {
-                                  day: '2-digit', month: 'short', year: 'numeric'
-                                })}
+                                {new Date(order.created_at).toLocaleDateString('en-GB')}
                               </div>
                             </td>
                             <td>

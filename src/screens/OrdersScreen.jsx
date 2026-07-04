@@ -141,7 +141,7 @@ const OrdersScreen = () => {
                   <div>
                     <span className="order-badge-id">{order.id.split('-')[0]}...</span>
                     <span className="order-date-label">
-                      <Calendar size={12} style={{ marginRight: '4px' }} /> {new Date(order.created_at).toLocaleDateString()}
+                      <Calendar size={12} style={{ marginRight: '4px' }} /> {new Date(order.created_at).toLocaleDateString('en-GB')}
                     </span>
                   </div>
                   <span className={`badge ${order.fulfillment_status === 'Delivered' ? 'badge-success' :
